@@ -12,6 +12,7 @@ import std/[paths, syncio, os, dirs, files, json, envvars, times]
 const
   SchemaVersion* = 1
   DefaultCheckEvery* = 30 * 24 * 60 * 60   ## seconds between lazy update checks
+  GlobalRoot* = path("~")  ## state key of the user scope; no project root is `~`
 
 type
   InstallMode* = enum
@@ -26,7 +27,7 @@ type
     files*: seq[Path]  ## Copy only: files NYX wrote, relative to `path`
 
   Project* = object
-    root*: Path  ## canonical absolute project root; the key
+    root*: Path  ## scope key: the project root, or `GlobalRoot` for the user scope
     targets*: seq[string]   ## target ids
     skills*: seq[string]
     installs*: seq[Install]
@@ -58,7 +59,7 @@ proc isStale*(s: State; t: int): bool =
   t - s.lastCheck >= s.checkEvery
 
 proc find*(s: State; root: Path): int =
-  ## Match project keys using normalized paths and the platform's case rules.
+  ## Match scope keys using normalized paths and the platform's case rules.
   result = -1
   for i in 0 ..< s.projects.len:
     if s.projects[i].root == root: return i

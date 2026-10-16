@@ -19,18 +19,19 @@ nimony c -o:bin/nyx src/nyx.nim
 ## Usage
 
 ```sh
-nyx          # set up this project, or show its status if already set up
-nyx setup    # set up or reconfigure this project
-nyx update   # update skills now
-nyx remove   # remove nyx from this project
-nyx -h       # help
+nyx              # set up this project, or show its status if already set up
+nyx setup -g     # set up the user's home skill directories instead
+nyx update       # update skills now (both scopes)
+nyx remove       # remove nyx from this project
+nyx remove -g    # remove it from the user's home directories
+nyx -h           # help
 ```
 
 Run `nyx` in a repository root. The project is keyed by the nearest enclosing directory holding a `.git` entry.
 
 ## Targets
 
-Skills land in `<project>/<skillDir>/<skill>` for each selected target. Only detected targets start ticked in the wizard. Targets sharing a skill directory install each skill once.
+Skills land in `<project>/<skillDir>/<skill>` for each selected target. With `-g` they land in `<home>/<globalDir>/<skill>` instead, and the two scopes are managed independently. Only detected targets start ticked in the wizard. Targets sharing a skill directory install each skill once.
 
 | Skill directory | Targets |
 | --- | --- |
@@ -43,13 +44,15 @@ Skills land in `<project>/<skillDir>/<skill>` for each selected target. Only det
 | `.roo/skills` | Roo Code |
 | `.continue/skills` | Continue |
 
+User-level directories differ where a tool looks in one place for the project and another for the user; Crush, OpenCode, Amp and Windsurf use `~/.config/<tool>/skills`, Antigravity uses `~/.gemini/config/skills`, and Pi uses `~/.pi/agent/skills`.
+
 Detection honors `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `XDG_CONFIG_HOME` for the tools that use them.
 
 ## Files
 
 State lives in the platform data directory (`~/.local/share/nyx` on Linux) or wherever `NYX_HOME` points:
 
-- `state.json` - what nyx manages, per project. Written by temporary file plus rename; unreadable state is set aside as `state.json.bad`.
+- `state.json` - what nyx manages, per project and for the user scope. Written by temporary file plus rename; unreadable state is set aside as `state.json.bad`.
 - `skills/` - the git clone of the skills repository.
 
 ## Environment

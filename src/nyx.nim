@@ -9,19 +9,26 @@ import state, targets, catalog, repo, install, ui
 type
   Ctx = object
     data: Path  ## NYX data directory
-    root: Path  ## canonical project root
+    root: Path  ## scope key: the project root, or `GlobalRoot` for the user scope
+    home: Path  ## the user's home directory
+    isGlobal: bool  ## acting on the user's home directories
     st: State
     corrupt: bool   ## state.json was unreadable and set aside
 
 # --- helpers ----------------------------------------------------------------
 
-proc display(file: Path): string =
-  ## `file` with the home directory shortened to `~`.
-  let p = $file
+proc cleanHome(): Path =
+  ## The user's home directory, without a trailing separator.
   var home = $pathdirs.getHomeDir()
   while home.len > 1 and home[^1] in {DirSep, AltSep} and
       not (home.len == 3 and home[1] == ':'):
     home.setLen(home.len - 1)
+  path(home)
+
+proc display(file: Path): string =
+  ## `file` with the home directory shortened to `~`.
+  let p = $file
+  let home = $cleanHome()
   if p == home: return "~"
   # Keep the separator in ~/child when home itself is a filesystem root.
   let n = if home.len > 0 and home[^1] in {DirSep, AltSep}: home.len - 1 else: home.len
@@ -63,13 +70,16 @@ proc save(c: Ctx) =
     fail "cannot write " & $statePath(c.data)
     quit(1)
 
-proc context(): Ctx =
-  result = Ctx(data: dataDir())
-  try:
-    result.root = projectRoot(path("."))
-  except:
-    fail "cannot resolve the current directory"
-    quit(1)
+proc context(isGlobal = false): Ctx =
+  result = Ctx(data: dataDir(), home: cleanHome(), isGlobal: isGlobal)
+  if isGlobal:
+    result.root = GlobalRoot
+  else:
+    try:
+      result.root = projectRoot(path("."))
+    except:
+      fail "cannot resolve the current directory"
+      quit(1)
   result.st = loadState(result.data, result.corrupt)
 
 proc notes(c: Ctx) =
@@ -77,6 +87,18 @@ proc notes(c: Ctx) =
     warn "state was unreadable, starting fresh" & dim("  (kept as state.json.bad)")
 
 proc project(c: Ctx): int = c.st.find(c.root)
+
+proc scopeName(c: Ctx): string =
+  ## What the scope line calls the scope nyx is acting on.
+  if c.isGlobal: "home" else: "project"
+
+proc scopePath(c: Ctx): string =
+  ## The scope itself, with the home directory shortened to `~`.
+  display(if c.isGlobal: c.home else: c.root)
+
+proc shown(c: Ctx; file: Path): string =
+  ## A path as the run reports it: relative to the project, or to `~`.
+  if c.isGlobal: display(file) else: c.rel(file)
 
 proc targetNames(ids: seq[string]): string =
   var names: seq[string] = @[]
@@ -170,14 +192,18 @@ proc refresh(c: var Ctx; setup = false): bool =
 
 # --- selection ---------------------------------------------------------------
 
-proc pickTargets(p: Project; configured: bool): seq[string] =
+proc pickTargets(c: Ctx; p: Project; configured: bool): seq[string] =
   let targets = allTargets()
-  let home = pathdirs.getHomeDir()
   var items: seq[Choice] = @[]
   var sel: seq[bool] = @[]
   for t in targets:
-    items.add Choice(label: t.name, detail: $t.skillDir)
-    sel.add(if configured: t.id in p.targets else: detect(t, p.root, home))
+    let detail = if c.isGlobal: t.globalDir else: t.skillDir
+    items.add Choice(label: t.name, detail: $detail)
+    var detected = false
+    if configured: detected = t.id in p.targets
+    elif c.isGlobal: detected = detect(t, path(""), c.home)
+    else: detected = detect(t, p.root, c.home)
+    sel.add detected
   choose(items, sel, minOne = true)
   result = @[]
   for i in 0..<targets.len:
@@ -199,7 +225,7 @@ proc pickSkills(skills: seq[Skill]; chosen: seq[string]): seq[string] =
 proc wizard(c: var Ctx) =
   splash()
   notes(c)
-  field "project", White & display(c.root)
+  field scopeName(c), White & scopePath(c)
   line()
 
   let store = skillsDir(c.data)
@@ -218,7 +244,7 @@ proc wizard(c: var Ctx) =
   var p = if idx >= 0: c.st.projects[idx] else: Project(root: c.root)
 
   heading "targets"
-  let ids = pickTargets(p, configured = idx >= 0)
+  let ids = pickTargets(c, p, configured = idx >= 0)
   line()
 
   heading "skills"
@@ -236,8 +262,9 @@ proc wizard(c: var Ctx) =
 
   p.targets = ids
   p.skills = chosen
-  let dirs = skillDirs(ids)
-  let rep = sync(p, store, dirs, chosen)
+  let dirs = skillDirs(ids, global = c.isGlobal)
+  let base = if c.isGlobal: c.home else: p.root
+  let rep = sync(p, store, dirs, chosen, base = base)
   for s in chosen:
     var links = 0
     var copies = 0
@@ -248,10 +275,10 @@ proc wizard(c: var Ctx) =
       let how = if copies == 0: "linked" elif links == 0: "copied" else: "placed"
       done(s, how & " -> " & $(links + copies) & " targets")
   for d in rep.removed:
-    line "  " & Blood & "- " & Reset & alignLeft(c.rel(d), 22) & dim("removed")
-  for d in rep.collisions: warn c.rel(d) & dim("  exists, not nyx's; left alone")
-  for d in rep.kept: warn c.rel(d) & dim("  modified; left alone")
-  for d in rep.failed: fail c.rel(d) & dim("  could not install")
+    line "  " & Blood & "- " & Reset & alignLeft(shown(c, d), 22) & dim("removed")
+  for d in rep.collisions: warn shown(c, d) & dim("  exists, not nyx's; left alone")
+  for d in rep.kept: warn shown(c, d) & dim("  modified; left alone")
+  for d in rep.failed: fail shown(c, d) & dim("  could not install")
 
   if idx >= 0: c.st.projects[idx] = p
   else: c.st.projects.add p
@@ -265,11 +292,12 @@ proc status(c: var Ctx) =
   banner()
   notes(c)
   let p = c.st.projects[project(c)]
-  field "project", White & display(c.root)
+  field scopeName(c), White & scopePath(c)
   field "targets", targetNames(p.targets)
   let gone = missing(p)
+  let rerun = if c.isGlobal: "nyx setup -g" else: "nyx setup"
   field "skills", $p.skills.len & " installed" &
-    (if gone > 0: Ember & "  " & $gone & " missing, run nyx setup" else: "")
+    (if gone > 0: Ember & "  " & $gone & " missing, run " & rerun else: "")
   field "checked", ago(c.st.lastCheck)
   if isStale(c.st, now()):
     line()
@@ -302,8 +330,9 @@ proc remove(c: var Ctx) =
     var n = 0
     for inst in p.installs:
       if parentDir(inst.path) == d: inc n
-    line "  " & Blood & "- " & Bone & alignLeft(c.rel(d), 18) & dim($n & " skills")
-  line "  " & Blood & "- " & Bone & alignLeft("nyx record", 18) & dim("project state")
+    line "  " & Blood & "- " & Bone & alignLeft(shown(c, d), 18) & dim($n & " skills")
+  line "  " & Blood & "- " & Bone & alignLeft("nyx record", 18) &
+    dim(scopeName(c) & " state")
   line()
   if not confirm("remove " & $p.skills.len & " skills from " & $dirs.len & " targets?", false):
     line "  " & dim("kept")
@@ -314,20 +343,21 @@ proc remove(c: var Ctx) =
   c.st.projects.delete(idx)
   save(c)
   done("removed", $rep.removed.len & " installs")
-  for d in rep.kept: warn c.rel(d) & dim("  modified; left alone")
+  for d in rep.kept: warn shown(c, d) & dim("  modified; left alone")
   line()
   line "  " & Bold & Blood & "gone" & Reset &
-    (if rep.kept.len == 0: dim("  project is clean") else: "")
+    (if rep.kept.len == 0: dim("  " & scopeName(c) & " is clean") else: "")
   line()
 
 proc main() =
+  # `cliapp` requires a command, so bare `nyx` is handled before it.
   if smartcli.paramCount() == 0:
     var c = context()
     if project(c) >= 0: status(c) else: wizard(c)
     return
   let opts = cliapp("""nyx - skills for your coding agents
 
-Usage: nyx [setup|update|remove]
+Usage: nyx [--global] [setup|update|remove]
 
   Run `nyx` alone to set up this project, or to see its status.
 
@@ -337,9 +367,10 @@ Commands:
   remove  Remove nyx from this project
 
 Options:
-  -h, --help  Show this help
+  -g, --global  Work on the user's home directories, not this project
+  -h, --help    Show this help
 """)
-  var c = context()
+  var c = context(isGlobal = opts.global)
   case opts.command
   of cmdSetup: wizard(c)
   of cmdUpdate: update(c)
