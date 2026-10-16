@@ -15,7 +15,7 @@ type
     id*: string              ## stable key, stored in state
     name*: string            ## shown in the wizard
     skillDir*: Path  ## project-relative skill directory
-    globalDir*: Path  ## home-relative skill directory (unused for now)
+    globalDir*: Path  ## home-relative skill directory
     markers: seq[Path]  ## project-relative paths that mean "in use"
     homeMarkers: seq[Path]  ## home-relative paths that mean "installed"
     homeEnv: string          ## environment override for the config directory
@@ -81,8 +81,10 @@ proc exists(p: Path): bool = dirExists($p) or fileExists($p)
 
 proc detect*(t: Target; root, home: Path): bool =
   ## Is this agent in use in `root`, or installed for the user at `home`?
-  for m in t.markers:
-    if exists(root / m): return true
+  ## An empty `root` means there is no project scope to inspect.
+  if root != path(""):
+    for m in t.markers:
+      if exists(root / m): return true
   let config = if t.homeEnv.len > 0: getEnv(t.homeEnv).strip() else: ""
   if config.len > 0:
     if exists(path(config) / t.envDir): return true
@@ -98,10 +100,13 @@ proc byId*(id: string): int =
   for i in 0 ..< all.len:
     if all[i].id == id: return i
 
-proc skillDirs*(ids: seq[string]): seq[Path] =
-  ## Distinct project skill directories for the selected target ids.
+proc skillDirs*(ids: seq[string]; global = false): seq[Path] =
+  ## Distinct skill directories for the selected target ids, relative to the
+  ## project root or, with `global`, to the user's home directory.
   result = @[]
   let all = allTargets()
   for id in ids:
     let i = byId(id)
-    if i >= 0 and all[i].skillDir notin result: result.add all[i].skillDir
+    if i >= 0:
+      let dir = if global: all[i].globalDir else: all[i].skillDir
+      if dir notin result: result.add dir

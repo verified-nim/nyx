@@ -75,6 +75,15 @@ proc testTargets(tmp: Path) {.raises.} =
           @[path(".agents/skills"), path(".claude/skills"), path(".devin/skills"),
             path(".roo/skills"), path(".continue/skills")],
               "distinct target paths")
+    check(skillDirs(@["codex", "agents", "goose", "codex"], global = true) ==
+          @[path(".agents/skills")],
+              "shared user directories install once")
+    check(skillDirs(@["claude", "crush", "agy"], global = true) ==
+          @[path(".claude/skills"), path(".config/crush/skills"),
+            path(".gemini/config/skills")],
+              "user directories are home-relative")
+    check(skillDirs(@["unknown"], global = true).len == 0,
+          "unknown target has no user directory")
 
     createDir(root / path(".agents"))
     check(detect(all[byId("agents")], root, home), "shared project marker")
@@ -96,6 +105,8 @@ proc testTargets(tmp: Path) {.raises.} =
     check(detect(all[byId("copilot")], root, home), "Copilot instructions marker")
     createDir(home / path(".roo"))
     check(detect(all[byId("roo")], root, home), "Roo home marker")
+    check(detect(all[byId("roo")], path(""), home), "Roo user marker")
+    check(not detect(all[byId("claude")], path(""), home), "user markers are per target")
 
     for (id, key, marker) in [("claude", "CLAUDE_CONFIG_DIR", ".claude"),
                               ("codex", "CODEX_HOME", ".codex")]:
@@ -204,6 +215,19 @@ proc testState(tmp: Path) {.raises.} =
   writeFile($(statePath(data)), "[1]")
   back = loadState(data, corrupt)
   check(corrupt, "non-object document is not trusted")
+
+  # The user scope is an ordinary entry, keyed by `GlobalRoot`.
+  let globalData = tmp / path("global-data")
+  var g = newState()
+  g.projects.add Project(root: GlobalRoot, targets: @["claude"], skills: @["alpha"],
+    installs: @[Install(path: path("/home/u/.agents/skills/alpha"), skill: "alpha",
+                        mode: Link, source: path("/s/alpha"))],
+    dirs: @[path("/home/u/.agents/skills")])
+  saveState(globalData, g)
+  var globalBack = loadState(globalData, corrupt)
+  check(not corrupt and globalBack.find(GlobalRoot) == 0 and
+        globalBack.projects[0].installs[0].path == path("/home/u/.agents/skills/alpha"),
+        "user scope round trips")
 
 proc testStale() =
   var s = newState()
@@ -417,6 +441,19 @@ proc testInstall(tmp: Path) {.raises.} =
   r = removeAll(u)
   check(r.kept == @[g] and readFile($(g / path("SKILL.md"))) == "replaced",
     "replacement left alone")
+
+  # The user scope: keyed by `GlobalRoot`, installed under the user's home.
+  var w = Project(root: GlobalRoot)
+  let userHome = tmp / path("user-home")
+  createDir(userHome)
+  r = sync(w, store, skillDirs(@["claude", "goose"], global = true), @["alpha"],
+           base = userHome)
+  check(r.placed.len == 2 and w.installs.len == 2, "user installs placed")
+  check(symlinkExists(userHome / path(".agents/skills/alpha")), "user skill linked")
+  check(missing(w) == 0, "user installs intact")
+  r = removeAll(w)
+  check(r.removed.len == 2 and not dirExists($(userHome / path(".agents"))),
+        "user installs removed and created dirs pruned")
 
 proc testRetargetedLink(tmp: Path) {.raises.} =
   # A user-retargeted link no longer belongs to NYX.
