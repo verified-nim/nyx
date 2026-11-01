@@ -8,7 +8,7 @@
 
 import std/[paths, symlinks, syncio, strutils, os, dirs, files, osproc, streams, envvars, tempfiles, opt]
 import ../src/[state, catalog, repo, install, targets]
-import paths, explain
+import paths
 
 var failures = 0   # single-threaded test program
 
@@ -371,12 +371,12 @@ proc testInstall(tmp: Path) {.raises.} =
     check(not taken(copyDir / path(name)), "refresh still skips source " & name)
 
   # Remove everything NYX made in both projects.
-  r = removeAll(p)
+  r = removeSkills(p, @["alpha"])
   check(r.kept.len == 0 and p.installs.len == 0, "links removed")
   check(not dirExists($(root / path(".pi"))), "empty created dirs pruned")
   check(readFile($(root / path(".claude/skills/alpha/SKILL.md"))) == "user's own alpha",
         "remove leaves unmanaged files")
-  r = removeAll(q)
+  r = removeSkills(q, @["alpha"])
   check(r.kept == @[copyDir], "modified copy reported as kept")
   check(fileExists($(copyDir / path("mine.txt"))) and not fileExists($(copyDir / path("SKILL.md"))),
         "only NYX's files removed from a copy")
@@ -389,7 +389,7 @@ proc testInstall(tmp: Path) {.raises.} =
   discard tryRemoveFile(g)
   mkfile(g / path("SKILL.md"), "replaced")
   check(missing(u) == 1, "replaced install counts as missing")
-  r = removeAll(u)
+  r = removeSkills(u, @["gamma"])
   check(r.kept == @[g] and readFile($(g / path("SKILL.md"))) == "replaced",
     "replacement left alone")
 
@@ -550,7 +550,6 @@ proc main() =
     tmp = createTempDir("nyx-test-", "")
     {.cast(assumeSync).}:
       failures += testPaths()
-      failures += testFirstLine()
     testState(tmp)
     testTargets(tmp)
     testStale()

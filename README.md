@@ -92,11 +92,11 @@ State lives in the platform data directory (`~/.local/share/nyx` on Linux) or wh
 
 - An existing destination that nyx did not create is a collision: it is reported and never touched. A link already pointing at the skill in nyx's clone counts as nyx's, so `nyx install` repairs a moved project or lost state.
 - Removal only acts on recorded installs that still look like what nyx made. Copy installs are removed file by file so added files survive.
-- Don't edit installed skills in place. A linked skill is the shared clone, so an edit reaches every project and can block updates; nyx names edited skills and how to discard the edits. A copied skill's edits are overwritten by updates and deleted on removal.
+- Don't edit installed skills in place. A linked skill is the shared clone, so an edit reaches every project and can block updates. A copied skill's edits are overwritten by updates and deleted on removal.
 - The skills clone is only ever fast-forwarded, never reset or merged.
 - Git never prompts for credentials; missing access or a network failure leaves installed skills in place.
 
-Updates are checked at most once every 15 days when `nyx` is run. A skill renamed or removed upstream is flagged; run `nyx remove` with the old name and `nyx install` with the new one.
+Updates are checked at most once every 15 days when `nyx` is run. A skill renamed or removed upstream leaves a dangling link, which agents ignore; the next `nyx install` clears it.
 
 ## Skill table page
 

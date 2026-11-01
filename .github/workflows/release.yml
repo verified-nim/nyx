@@ -18,7 +18,7 @@ env:
   NIMONY_REPO: https://github.com/nim-lang/nimony
   # Must be a commit on nim-lang/nimony master. `git fetch <sha>` at this depth
   # only succeeds while GitHub still advertises the commit.
-  NIMONY_COMMIT: 8f940ac15f66776f79c9525a8cb1e84ce645e0b6
+  NIMONY_COMMIT: 8e0321d8917bc55953b17a354f6fd478890d479f
 
 jobs:
   build:

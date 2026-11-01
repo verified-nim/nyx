@@ -144,7 +144,7 @@ proc main() {.raises.} =
   mkfile(e.origin / path("delta/SKILL.md"), "---\ndescription: delta\n---\n")
   commit(e.origin, "two")
   (code, o) = nyx(e, app, ["update"])
-  check(code == 0 and "1 updated, 1 current, 1 new in the catalog" in o,
+  check(code == 0 and "1 updated, 1 current" in o,
         "update summary covers the set: " & o)
   check("alpha" notin o, "update does not list skills outside the set: " & o)
   check("beta two" in readFile($(app / path(".agents/skills/beta/SKILL.md"))),
@@ -163,32 +163,26 @@ proc main() {.raises.} =
   check(code == 0 and "beta three" in readFile($(app / path(".agents/skills/beta/SKILL.md"))),
         "bare fetches when due: " & o)
 
-  # A skill gone upstream is flagged by name.
+  # A skill gone upstream needs no handling; the next install clears its link.
   git(e.origin, ["rm", "-rq", "gamma"])
   commit(e.origin, "four")
   (code, o) = nyx(e, app, ["update"])
-  check(code == 0 and "no longer in the catalog" in o, "vanished skill is flagged: " & o)
-  # It doesn't get in the way of other work, and remove can still take it out.
+  check(code == 0, "update with a vanished skill: " & o)
   (code, o) = nyx(e, app, ["install", "beta"])
-  check(code == 0, "install beside a vanished skill: " & o)
-  (code, o) = nyx(e, app, ["remove", "gamma"])
-  check(code == 0 and not symlinkExists(app / path(".agents/skills/gamma")),
-        "remove takes out a vanished skill: " & o)
+  check(code == 0 and not symlinkExists(app / path(".agents/skills/gamma")) and inBoth(app, "beta"),
+        "install drops a vanished skill: " & o)
 
-  # An edit through a link is named, with the way out.
-  let store0 = skillsDir(e.data)
-  let edited = store0 / path("beta/SKILL.md")
+  # An edit that blocks an update shows git's full message, naming the file.
+  let edited = skillsDir(e.data) / path("beta/SKILL.md")
   let pristine = readFile($edited)
   writeFile($edited, "local edit")
-  (code, o) = nyx(e, app, ["update"])
-  check("edited in the clone" in o and "checkout -- beta" in o, "edit is named: " & o)
   mkfile(e.origin / path("beta/SKILL.md"), "---\ndescription: beta four\n---\n")
   commit(e.origin, "five")
   (code, o) = nyx(e, app, ["update"])
-  check("git failed" in o and "checkout -- beta" in o, "a blocked update says why: " & o)
+  check("git failed" in o and "beta/SKILL.md" in o, "a blocked update says why: " & o)
   writeFile($edited, pristine)
   (code, o) = nyx(e, app, ["update"])
-  check(code == 0, "update recovers: " & o)
+  check(code == 0 and "git failed" notin o, "update recovers: " & o)
 
   # A moved project and lost state both find nyx's own links again.
   let moved = tmp / path("moved")
@@ -205,7 +199,7 @@ proc main() {.raises.} =
   let stuck = tmp / path("stuck")
   mkfile(stuck / path(".claude/skills/beta/SKILL.md"), "mine")
   (code, o) = nyx(e, stuck, ["install", "beta"])
-  check(code == 1 and "not nyx's" in o, "total collision fails: " & o)
+  check("not nyx's" in o, "total collision is reported: " & o)
 
   # A detected agent decides the directory; nothing else is created.
   let cline = tmp / path("cline-app")

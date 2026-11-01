@@ -186,20 +186,11 @@ proc sync*(p: var Project; store: Path; dirs: seq[Path]; skills: seq[string];
           p.installs.add own
         elif taken(dest):
           result.collisions.add dest
-        elif not dirExists($(store / path(s))):
-          result.failed.add dest
         else:
           try:
             place(p, s, store / path(s), dest, copy)
           except:
             result.failed.add dest
-  pruneDirs(p)
-
-proc removeAll*(p: var Project): Report =
-  ## Undo everything NYX did in this project.
-  result = Report()
-  for inst in p.installs: takeOut(inst, result)
-  p.installs = @[]
   pruneDirs(p)
 
 proc removeSkills*(p: var Project; skills: seq[string]): Report =

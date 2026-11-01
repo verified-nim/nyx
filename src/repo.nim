@@ -82,27 +82,16 @@ proc head*(dir: Path): string =
   var o = ""
   result = if git(["-C", $dir, "rev-parse", "HEAD"], o) == Done: o.strip() else: ""
 
-proc topDirs(names: string): seq[string] =
-  ## Top-level directories of NUL-separated paths.
-  result = @[]
-  for line in names.split('\0'):
-    let slash = line.find('/')
-    if slash > 0:
-      let top = line.substr(0, slash - 1)
-      if top notin result: result.add top
-
 proc changedSkills*(dir: Path; fromRev, toRev: string): seq[string] =
   ## Top-level directories touched between two commits.
   result = @[]
   if fromRev.len == 0 or toRev.len == 0 or fromRev == toRev: return
   var o = ""
   # NUL preserves literal paths; disabling renames reports both sides of a move.
-  if git(["-C", $dir, "diff", "--name-only", "--no-renames", "-z", fromRev, toRev], o) == Done:
-    result = topDirs(o)
-
-proc editedSkills*(dir: Path): seq[string] =
-  ## Skills with uncommitted changes to tracked files: edits made through a link.
-  result = @[]
-  var o = ""
-  if git(["-C", $dir, "diff", "--name-only", "--no-renames", "-z", "HEAD"], o) == Done:
-    result = topDirs(o)
+  if git(["-C", $dir, "diff", "--name-only", "--no-renames", "-z", fromRev, toRev], o) != Done:
+    return
+  for line in o.split('\0'):
+    let slash = line.find('/')
+    if slash > 0:
+      let top = line.substr(0, slash - 1)
+      if top notin result: result.add top
