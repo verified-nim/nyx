@@ -5,7 +5,7 @@ import std/[appdirs, paths, syncio, strutils, os, dirs, smartcli]
 import state, targets, catalog, repo, install, ui
 
 const
-  PageUrl = "https://planetis-m.github.io/nyx/"
+  PageUrl = "https://verified-nim.github.io/nyx/"
 
 type
   Ctx = object

@@ -1,6 +1,6 @@
 # Installs the nyx binary from GitHub Releases on Windows.
 #
-#   irm https://github.com/planetis-m/nyx/releases/latest/download/install.ps1 | iex
+#   irm https://github.com/verified-nim/nyx/releases/latest/download/install.ps1 | iex
 #
 # $env:NYX_VERSION      release tag to install (default: the latest release)
 # $env:NYX_INSTALL_DIR  where to put nyx.exe (default: %LOCALAPPDATA%\Programs\nyx)
@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$repo = 'planetis-m/nyx'
+$repo = 'verified-nim/nyx'
 $version = if ($env:NYX_VERSION) { $env:NYX_VERSION } else { 'latest' }
 $dir = if ($env:NYX_INSTALL_DIR) { $env:NYX_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'Programs\nyx' }
 

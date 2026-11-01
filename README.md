@@ -9,13 +9,13 @@ Skills are cloned once into nyx's data directory. Each project gets symlinks (or
 Linux and macOS (installs to `~/.local/bin`):
 
 ```sh
-curl -fsSL https://github.com/planetis-m/nyx/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/verified-nim/nyx/releases/latest/download/install.sh | sh
 ```
 
 Windows (PowerShell; installs to `%LOCALAPPDATA%\Programs\nyx` and adds it to the user `PATH`):
 
 ```powershell
-irm https://github.com/planetis-m/nyx/releases/latest/download/install.ps1 | iex
+irm https://github.com/verified-nim/nyx/releases/latest/download/install.ps1 | iex
 ```
 
 The scripts pick the archive for your OS and architecture, verify it against the release's `SHA256SUMS`, and install the single `nyx` binary. Set `NYX_VERSION` to a tag such as `v0.1.0` to install a specific release, or `NYX_INSTALL_DIR` to install elsewhere.
@@ -38,7 +38,7 @@ Release binaries are built with the native backend (`nimony n -d:release -o:bin/
 
 ## Usage
 
-Pick your skills on the [skill table](https://planetis-m.github.io/nyx/); it gives you the install command. Run it in your project:
+Pick your skills on the [skill table](https://verified-nim.github.io/nyx/); it gives you the install command. Run it in your project:
 
 ```sh
 nyx install nim-testing nim-style-guide  # make this project's skills exactly these
@@ -71,7 +71,7 @@ Detection honors `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `XDG_CONFIG_HOME` for th
 
 Projects set up by 0.2 keep working: `nyx` shows them, `nyx update` updates them, `nyx install` changes their skills and keeps their agents, and `nyx remove` clears them.
 
-The wizard, `nyx setup` and user-level installs (`-g`) stay on the [`v0.2` branch](https://github.com/planetis-m/nyx/tree/v0.2). User-level skills set up by 0.2 keep updating here; to change or remove them, use a 0.2 binary (`NYX_VERSION=v0.2.4` with the install script).
+The wizard, `nyx setup` and user-level installs (`-g`) stay on the [`v0.2` branch](https://github.com/verified-nim/nyx/tree/v0.2). User-level skills set up by 0.2 keep updating here; to change or remove them, use a 0.2 binary (`NYX_VERSION=v0.2.4` with the install script).
 
 ## Files
 

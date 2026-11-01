@@ -62,7 +62,7 @@
   function resetNote() {
     const n = $("note");
     n.className = "note";
-    n.innerHTML = 'Needs <a href="https://github.com/planetis-m/nyx">nyx</a> and a <a href="https://verified-nim.github.io/get-access.html">subscription</a>. Installs for Claude Code, Codex, Cursor and more.';
+    n.innerHTML = 'Needs <a href="https://github.com/verified-nim/nyx">nyx</a> and a <a href="https://verified-nim.github.io/get-access.html">subscription</a>. Installs for Claude Code, Codex, Cursor and more.';
   }
   function render() {
     document.querySelectorAll(".tile").forEach(t => {

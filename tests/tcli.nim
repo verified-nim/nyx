@@ -75,7 +75,7 @@ proc main() {.raises.} =
 
   # A fresh project points to the page and fetches nothing.
   var (code, o) = nyx(e, app, [])
-  check(code == 0 and "planetis-m.github.io/nyx" in o, "bare in a fresh project points to the page: " & o)
+  check(code == 0 and "verified-nim.github.io/nyx" in o, "bare in a fresh project points to the page: " & o)
   check(not dirExists($skillsDir(e.data)), "bare in a fresh project does not clone")
 
   # No access on first use: nothing recorded, a useful hint.
@@ -108,7 +108,7 @@ proc main() {.raises.} =
 
   # No names is not a request to clear the set.
   (code, o) = nyx(e, app, ["install"])
-  check(code == 1 and "planetis-m.github.io/nyx" in o and inBoth(app, "alpha"), "install with no names: " & o)
+  check(code == 1 and "verified-nim.github.io/nyx" in o and inBoth(app, "alpha"), "install with no names: " & o)
 
   # Exact set: alpha goes, the user's own skill stays and is not claimed.
   mkfile(app / path(".claude/skills/own/SKILL.md"), "mine")
@@ -188,7 +188,7 @@ proc main() {.raises.} =
   check(code == 0 and not taken(app / path(".agents")), "remove prunes what nyx created: " & o)
   check(fileExists($(app / path(".claude/skills/own/SKILL.md"))), "remove leaves own skill")
   (code, o) = nyx(e, app, [])
-  check("planetis-m.github.io/nyx" in o, "removed project is fresh again")
+  check("verified-nim.github.io/nyx" in o, "removed project is fresh again")
   (code, o) = nyx(e, app, ["remove"])
   check(code == 0 and "nothing to remove" in o, "remove with no set: " & o)
 
@@ -212,7 +212,7 @@ proc main() {.raises.} =
             path(expandFilename($old)) / path(".crush/skills")])
   saveState(e.data, st)
   (code, o) = nyx(e, old, [])
-  check(code == 0 and "beta" in o and "planetis-m.github.io/nyx" notin o, "bare reads a 0.2 project: " & o)
+  check(code == 0 and "beta" in o and "verified-nim.github.io/nyx" notin o, "bare reads a 0.2 project: " & o)
   (code, o) = nyx(e, old, ["install", "beta"])
   check(code == 0 and linkedSkill(old, ".crush/skills", "beta") and
         not taken(old / path(".agents")), "install keeps a 0.2 project's directories: " & o)
