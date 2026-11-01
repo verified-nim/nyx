@@ -68,8 +68,7 @@ main { display: grid; align-content: start; gap: 10px; overflow-y: auto; }
   position: relative;
   padding: 6px 7px 7px;
   display: grid;
-  grid-template-rows: 12px 28px 1fr;
-  gap: 3px;
+  grid-template-rows: 12px 1fr 24px; /* number, symbol, two lines of name */
   text-align: left;
   background: var(--paper);
   border: 1px solid var(--line);
@@ -77,8 +76,8 @@ main { display: grid; align-content: start; gap: 10px; overflow-y: auto; }
   cursor: pointer;
 }
 .no { font-size: 0.625rem; line-height: 12px; font-weight: 600; color: var(--muted); }
-.sym { font-size: 1.75rem; line-height: 1; font-weight: 800; letter-spacing: -0.02em; }
-.nm { padding-top: 5px; font-size: 0.625rem; line-height: 1.15; font-weight: 600; color: var(--muted); overflow-wrap: anywhere; hyphens: auto; }
+.sym { align-self: center; font-size: 1.75rem; line-height: 1; font-weight: 800; letter-spacing: -0.02em; }
+.nm { font-size: 0.625rem; line-height: 12px; font-weight: 600; color: var(--muted); overflow-wrap: anywhere; hyphens: auto; }
 .tile:hover { background: color-mix(in srgb, var(--c) 28%, var(--paper)); }
 .tile:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 .tile.on { background: var(--c); border-color: transparent; color: #16171d; }
@@ -150,7 +149,7 @@ main { display: grid; align-content: start; gap: 10px; overflow-y: auto; }
   main { gap: 16px; overflow: visible; }
   .row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .rhead { display: flex; align-items: baseline; gap: 8px; padding-left: 8px; }
-  .tiles { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+  .tiles { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
   .dockin { grid-template-columns: minmax(0, 1fr); gap: 8px; padding-block: 10px; }
 }
 
