@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   const CAP = 8000;
-  const SIZES = [[0, "Nothing selected"], [1, "Light set"], [3, "Focused set"], [6, "Broad set"], [10, "Large set"]];
+  const RANKS = [[10, "Large set"], [6, "Broad set"], [3, "Focused set"], [1, "Light set"], [0, "Nothing selected"]];
   const sel = new Set();
   const sizes = {};
   const groupEls = [];
@@ -11,12 +11,12 @@
   const short = n => n.replace(/^nimony-/, "").replace(/^nim-/, "").replace(/-build-debugging$/, "-build");
   let copyTimer = 0;
 
-  function cap(s) { return s[0].toUpperCase() + s.slice(1).toLowerCase(); }
+  function titleCase(s) { return s[0].toUpperCase() + s.slice(1).toLowerCase(); }
   // Initials, or the first two letters when the row has already used those initials.
   function symbol(n, used) {
     const w = short(n).split("-");
-    const initials = w.length > 1 ? cap(w[0][0] + w[1][0]) : "";
-    const s = initials && !used.has(initials) ? initials : cap(w[0].slice(0, 2));
+    const initials = w.length > 1 ? titleCase(w[0][0] + w[1][0]) : "";
+    const s = initials && !used.has(initials) ? initials : titleCase(w[0].slice(0, 2));
     used.add(s);
     return s;
   }
@@ -69,7 +69,7 @@
     const count = sel.size;
     const chars = [...sel].reduce((s, n) => s + sizes[n], 0);
     const full = chars > CAP;
-    $("rank").textContent = full ? "Context full" : [...SIZES].reverse().find(r => count >= r[0])[1];
+    $("rank").textContent = full ? "Context full" : RANKS.find(r => count >= r[0])[1];
     $("count").textContent = `${count} of ${Object.keys(sizes).length}`;
     $("chars").textContent = `${fmt(chars)} / ${fmt(CAP)} context`;
     $("stat").classList.toggle("full", full);
@@ -86,7 +86,7 @@
     try {
       await navigator.clipboard.writeText(command());
       copy.textContent = "Copied";
-    } catch (_) {
+    } catch {
       copy.textContent = "Blocked";
     }
     clearTimeout(copyTimer);

@@ -138,9 +138,9 @@ main { display: grid; align-content: start; gap: 10px; overflow-y: auto; }
   font-weight: 600;
   cursor: pointer;
 }
-.copy:hover { opacity: 0.85; }
+.copy:enabled:hover { opacity: 0.85; }
 .copy:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-.copy:disabled { background: var(--line); color: var(--muted); opacity: 1; cursor: default; }
+.copy:disabled { background: var(--line); color: var(--muted); cursor: default; }
 .note { margin-top: 4px; font-size: 0.75rem; line-height: 16px; color: var(--muted); }
 
 @media (max-width: 1023px) {
