@@ -178,7 +178,7 @@ proc showSkills(c: Ctx; p: Project) =
 
 proc showChanges(c: Ctx; rep: Report) =
   for d in rep.removed:
-    line "  " & Blood & "- " & Reset & c.rel(d) & "  " & dim("removed")
+    line "  " & Alert & "- " & Reset & c.rel(d) & "  " & dim("removed")
   for d in rep.collisions: warn c.rel(d) & dim("  exists, not nyx's; left alone")
   for d in rep.kept: warn c.rel(d) & dim("  modified; left alone")
 
@@ -191,7 +191,7 @@ proc status(c: var Ctx) =
     pointToPage()
     line()
     return
-  field "project", White & display(c.root)
+  field "project", display(c.root)
   if isStale(c.st, now()):
     var changes = Changes()
     if refresh(c, changes): report(c.st.projects[idx], changes)
@@ -275,7 +275,7 @@ proc installSkills(c: var Ctx; wanted: seq[string]) =
   var places: seq[string] = @[]
   for d in dirs: places.add $d
   line()
-  line "  " & Bold & Gold & "ready" & Reset &
+  line "  " & Bold & "ready" & Reset &
     dim("  " & $p.skills.len & " skills in " & places.join(", "))
   line()
   if short: quit(1)
@@ -312,7 +312,7 @@ proc remove(c: var Ctx; names: seq[string]) =
     line "  " & dim("nothing changed")
     line()
     quit(1)
-  field "project", White & display(c.root)
+  field "project", display(c.root)
   let rep = removeSkills(p, names)
   var left: seq[string] = @[]
   for name in p.skills:
@@ -334,7 +334,7 @@ proc clear(c: var Ctx) =
     line "  " & dim("nothing to remove here")
     line()
     return
-  field "project", White & display(c.root)
+  field "project", display(c.root)
   var p = c.st.projects[idx]
   let rep = removeAll(p)
   c.st.projects.delete(idx)
