@@ -106,16 +106,33 @@ proc main() {.raises.} =
   check(inBoth(app, "alpha") and inBoth(app, "beta") and not inBoth(app, "gamma"),
         "rejected install leaves the set alone")
 
-  # No names is not a request to clear the set.
+  # No names is not a request for anything but the page; any install restores.
   (code, o) = nyx(e, app, ["install"])
   check(code == 1 and "verified-nim.github.io/nyx" in o and inBoth(app, "alpha"), "install with no names: " & o)
+  removeFile(app / path(".claude/skills/alpha"))
+  (code, o) = nyx(e, app, ["install", "beta"])
+  check(code == 0 and inBoth(app, "alpha"), "install restores what went missing: " & o)
+  let blank = tmp / path("blank")
+  createDir(blank)
 
-  # Exact set: alpha goes, the user's own skill stays and is not claimed.
+  # Remove takes names; a wrong one changes nothing, and none is not "all".
+  (code, o) = nyx(e, app, ["remove"])
+  check(code == 1 and "nyx clear" in o and inBoth(app, "alpha"), "remove with no names: " & o)
+  (code, o) = nyx(e, app, ["remove", "alpha", "gamma"])
+  check(code == 1 and "gamma" in o and "nothing changed" in o and inBoth(app, "alpha"),
+        "remove of a skill not installed: " & o)
+  (code, o) = nyx(e, blank, ["remove", "alpha"])
+  check(code == 1 and "not installed" in o, "remove with no set: " & o)
+  (code, o) = nyx(e, app, ["remove", "alpha"])
+  check(code == 0 and not taken(app / path(".agents/skills/alpha")) and
+        not taken(app / path(".claude/skills/alpha")) and inBoth(app, "beta") and "beta" in o,
+        "remove takes out only the named skill: " & o)
+
+  # Install adds: beta stays, the user's own skill stays and is not claimed.
   mkfile(app / path(".claude/skills/own/SKILL.md"), "mine")
   mkfile(app / path(".claude/skills/gamma/SKILL.md"), "my gamma")
-  (code, o) = nyx(e, app, ["install", "beta", "gamma"])
-  check(code == 0 and not taken(app / path(".agents/skills/alpha")) and
-        not taken(app / path(".claude/skills/alpha")), "install removes what left the set: " & o)
+  (code, o) = nyx(e, app, ["install", "gamma"])
+  check(code == 0 and inBoth(app, "beta"), "install adds to the set: " & o)
   check(fileExists($(app / path(".claude/skills/own/SKILL.md"))), "own skill survives")
   check(readFile($(app / path(".claude/skills/gamma/SKILL.md"))) == "my gamma" and
         "exists, not nyx's" in o, "collision left alone and reported")
@@ -151,6 +168,44 @@ proc main() {.raises.} =
   commit(e.origin, "four")
   (code, o) = nyx(e, app, ["update"])
   check(code == 0 and "no longer in the catalog" in o, "vanished skill is flagged: " & o)
+  # It doesn't get in the way of other work, and remove can still take it out.
+  (code, o) = nyx(e, app, ["install", "beta"])
+  check(code == 0, "install beside a vanished skill: " & o)
+  (code, o) = nyx(e, app, ["remove", "gamma"])
+  check(code == 0 and not symlinkExists(app / path(".agents/skills/gamma")),
+        "remove takes out a vanished skill: " & o)
+
+  # An edit through a link is named, with the way out.
+  let store0 = skillsDir(e.data)
+  let edited = store0 / path("beta/SKILL.md")
+  let pristine = readFile($edited)
+  writeFile($edited, "local edit")
+  (code, o) = nyx(e, app, ["update"])
+  check("edited in the clone" in o and "checkout -- beta" in o, "edit is named: " & o)
+  mkfile(e.origin / path("beta/SKILL.md"), "---\ndescription: beta four\n---\n")
+  commit(e.origin, "five")
+  (code, o) = nyx(e, app, ["update"])
+  check("git failed" in o and "checkout -- beta" in o, "a blocked update says why: " & o)
+  writeFile($edited, pristine)
+  (code, o) = nyx(e, app, ["update"])
+  check(code == 0, "update recovers: " & o)
+
+  # A moved project and lost state both find nyx's own links again.
+  let moved = tmp / path("moved")
+  createDir(moved)
+  (code, o) = nyx(e, moved, ["install", "beta"])
+  let moved2 = tmp / path("moved2")
+  moveDir(moved, moved2)
+  (code, o) = nyx(e, moved2, ["install", "beta"])
+  check(code == 0 and "not nyx's" notin o and "beta" in o, "moved project adopts its links: " & o)
+  (code, o) = nyx(e, moved2, ["remove", "beta"])
+  check(code == 0 and not taken(moved2 / path(".claude/skills/beta")), "adopted links can be removed: " & o)
+
+  # A skill that could not go anywhere is a failure.
+  let stuck = tmp / path("stuck")
+  mkfile(stuck / path(".claude/skills/beta/SKILL.md"), "mine")
+  (code, o) = nyx(e, stuck, ["install", "beta"])
+  check(code == 1 and "not nyx's" in o, "total collision fails: " & o)
 
   # A detected agent decides the directory; nothing else is created.
   let cline = tmp / path("cline-app")
@@ -164,7 +219,7 @@ proc main() {.raises.} =
   (code, o) = nyx(e, cline, ["install", "beta"])
   check(linkedSkill(cline, ".cline/skills", "beta") and
         linkedSkill(cline, ".agents/skills", "beta"), "later agent joins: " & o)
-  (code, o) = nyx(e, cline, ["remove"])
+  (code, o) = nyx(e, cline, ["clear"])
   check(not taken(cline / path(".cline/skills")) and dirExists($(cline / path(".cline"))),
         "remove leaves the agent's own folder: " & o)
 
@@ -175,7 +230,7 @@ proc main() {.raises.} =
   (code, o) = nyx(e, other, ["install", "beta"])
   check(linkedSkill(other, ".roo/skills", "beta") and not taken(other / path(".claude")),
         "home marker selects the agent's directory: " & o)
-  (code, o) = nyx(e, other, ["remove"])
+  (code, o) = nyx(e, other, ["clear"])
   removeDir(e.home / path(".roo"))
 
   # Old flags and commands are gone.
@@ -183,14 +238,14 @@ proc main() {.raises.} =
     (code, o) = nyx(e, app, args)
     check(code != 0, "rejected: " & args.join(" "))
 
-  # Remove clears the set and only that.
-  (code, o) = nyx(e, app, ["remove"])
-  check(code == 0 and not taken(app / path(".agents")), "remove prunes what nyx created: " & o)
-  check(fileExists($(app / path(".claude/skills/own/SKILL.md"))), "remove leaves own skill")
+  # Clear empties the set and only that.
+  (code, o) = nyx(e, app, ["clear"])
+  check(code == 0 and not taken(app / path(".agents")), "clear prunes what nyx created: " & o)
+  check(fileExists($(app / path(".claude/skills/own/SKILL.md"))), "clear leaves own skill")
   (code, o) = nyx(e, app, [])
   check("verified-nim.github.io/nyx" in o, "removed project is fresh again")
-  (code, o) = nyx(e, app, ["remove"])
-  check(code == 0 and "nothing to remove" in o, "remove with no set: " & o)
+  (code, o) = nyx(e, app, ["clear"])
+  check(code == 0 and "nothing to remove" in o, "clear with no set: " & o)
 
   # A project and a user scope set up by nyx 0.2 stay manageable.
   let old = tmp / path("old")
@@ -216,10 +271,13 @@ proc main() {.raises.} =
   (code, o) = nyx(e, old, ["install", "beta"])
   check(code == 0 and linkedSkill(old, ".crush/skills", "beta") and
         not taken(old / path(".agents")), "install keeps a 0.2 project's directories: " & o)
-  (code, o) = nyx(e, old, ["remove"])
-  check(code == 0 and not taken(old / path(".crush")), "remove clears a 0.2 project: " & o)
+  (code, o) = nyx(e, old, ["clear"])
+  check(code == 0 and not taken(old / path(".crush")), "clear empties a 0.2 project: " & o)
   st = loadState(e.data).state
-  check(st.projects.len == 1 and st.projects[0].global and symlinkExists(home),
+  var globals = 0
+  for q in st.projects:
+    if q.global: inc globals
+  check(globals == 1 and st.find(path(expandFilename($old))) < 0 and symlinkExists(home),
         "the 0.2 user scope is left alone")
 
 try:

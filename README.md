@@ -41,18 +41,19 @@ Release binaries are built with the native backend (`nimony n -d:release -o:bin/
 Pick your skills on the [skill table](https://verified-nim.github.io/nyx/); it gives you the install command. Run it in your project:
 
 ```sh
-nyx install nim-testing nim-style-guide  # make this project's skills exactly these
+nyx install nim-testing nim-style-guide  # add these skills to this project
+nyx remove nim-testing                   # remove this skill
+nyx clear                                # remove all of this project's skills
 nyx                                      # show them, updating when a check is due
 nyx update                               # update now
-nyx remove                               # remove this project's skills
 nyx -h                                   # help
 ```
 
-`install` has no flags and asks no questions. Skills not in the list that nyx installed earlier are removed; an unknown name changes nothing. The project is the nearest enclosing directory holding a `.git` entry.
+Commands have no flags and ask no questions. An unknown name changes nothing, and neither does removing a skill that isn't installed. To start from an exact set, run `nyx clear` and then the page's command. The project is the nearest enclosing directory holding a `.git` entry.
 
 ## Targets
 
-`install` places skills in the directory of each agent it detects, from project markers, home markers and executables on `PATH`. With none detected, it uses `.agents/skills` and `.claude/skills`. An agent recorded for a project stays when it is reinstalled; `nyx remove` starts over.
+`install` places skills in the directory of each agent it detects, from project markers, home markers and executables on `PATH`. With none detected, it uses `.agents/skills` and `.claude/skills`. An agent recorded for a project stays when it is reinstalled; `nyx clear` starts over.
 
 | Skill directory | Targets |
 | --- | --- |
@@ -69,7 +70,7 @@ Detection honors `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `XDG_CONFIG_HOME` for th
 
 ## Upgrading from nyx 0.2
 
-Projects set up by 0.2 keep working: `nyx` shows them, `nyx update` updates them, `nyx install` changes their skills and keeps their agents, and `nyx remove` clears them.
+Projects set up by 0.2 keep working: `nyx` shows them, `nyx update` updates them, `nyx install` and `nyx remove` change their skills and keep their agents, and `nyx clear` clears them.
 
 The wizard, `nyx setup` and user-level installs (`-g`) stay on the [`v0.2` branch](https://github.com/verified-nim/nyx/tree/v0.2). User-level skills set up by 0.2 keep updating here; to change or remove them, use a 0.2 binary (`NYX_VERSION=v0.2.4` with the install script).
 
@@ -84,17 +85,18 @@ State lives in the platform data directory (`~/.local/share/nyx` on Linux) or wh
 
 | Variable | Effect |
 | --- | --- |
-| `NYX_REPO` | Use another skills repository. |
+| `NYX_REPO` | Use another skills repository. Only read when first cloning: to switch, delete `skills/` from the data directory and run `nyx install`. |
 | `NYX_HOME` | Use another data directory. |
 
 ## Safety
 
-- An existing destination that nyx did not create is a collision: it is reported and never touched.
-- Removal only acts on recorded installs that still look like what nyx made; skills a user edited are left alone, and copy installs are removed file by file so added files survive.
+- An existing destination that nyx did not create is a collision: it is reported and never touched. A link already pointing at the skill in nyx's clone counts as nyx's, so `nyx install` repairs a moved project or lost state.
+- Removal only acts on recorded installs that still look like what nyx made. Copy installs are removed file by file so added files survive.
+- Don't edit installed skills in place. A linked skill is the shared clone, so an edit reaches every project and can block updates; nyx names edited skills and how to discard the edits. A copied skill's edits are overwritten by updates and deleted on removal.
 - The skills clone is only ever fast-forwarded, never reset or merged.
 - Git never prompts for credentials; missing access or a network failure leaves installed skills in place.
 
-Updates are checked at most once every 15 days when `nyx` is run. A skill renamed or removed upstream is flagged; run `nyx install` with the current names to replace it.
+Updates are checked at most once every 15 days when `nyx` is run. A skill renamed or removed upstream is flagged; run `nyx remove` with the old name and `nyx install` with the new one.
 
 ## Skill table page
 

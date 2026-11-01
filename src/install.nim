@@ -3,7 +3,8 @@
 ##
 ## Safety rules:
 ## * a destination that already exists and is not recorded in state is a
-##   collision: it is reported and never touched;
+##   collision: it is reported and never touched, unless it is already the
+##   link NYX would make, which is adopted (moved project, lost state);
 ## * removal only ever acts on recorded installs, and only while they still
 ##   look like what NYX made (the same link, or a real directory for a copy);
 ## * a copy is removed file by file from its recorded list, and directories
@@ -14,7 +15,6 @@ import state
 
 type
   Report* = object
-    placed*: seq[Path]      ## destinations created
     removed*: seq[Path]     ## destinations removed
     collisions*: seq[Path]  ## existing, not NYX's: left alone
     kept*: seq[Path]        ## NYX's, but changed by the user: left alone
@@ -133,6 +133,10 @@ proc unplace*(inst: Install): bool =
     removeEmptyDirs(inst.path)
   result = not taken(inst.path)
 
+proc takeOut(inst: Install; rep: var Report) =
+  if unplace(inst): rep.removed.add inst.path
+  else: rep.kept.add inst.path
+
 proc resync*(inst: var Install) {.raises.} =
   ## Bring a copy up to date with its source. Links need nothing. A skill
   ## that vanished upstream keeps its last copy.
@@ -164,10 +168,8 @@ proc sync*(p: var Project; store: Path; dirs: seq[Path]; skills: seq[string];
     if inst.path in want:
       # Missing or replaced installs are no longer ours.
       if intact(inst): keep.add inst
-    elif unplace(inst):
-      result.removed.add inst.path
     else:
-      result.kept.add inst.path
+      takeOut(inst, result)
   p.installs = keep
 
   for b in bases:
@@ -179,14 +181,16 @@ proc sync*(p: var Project; store: Path; dirs: seq[Path]; skills: seq[string];
           have = true
           break
       if not have:
-        if taken(dest):
+        let own = Install(path: dest, skill: s, mode: Link, source: store / path(s))
+        if intact(own):
+          p.installs.add own
+        elif taken(dest):
           result.collisions.add dest
         elif not dirExists($(store / path(s))):
           result.failed.add dest
         else:
           try:
             place(p, s, store / path(s), dest, copy)
-            result.placed.add dest
           except:
             result.failed.add dest
   pruneDirs(p)
@@ -194,10 +198,18 @@ proc sync*(p: var Project; store: Path; dirs: seq[Path]; skills: seq[string];
 proc removeAll*(p: var Project): Report =
   ## Undo everything NYX did in this project.
   result = Report()
-  for inst in p.installs:
-    if unplace(inst): result.removed.add inst.path
-    else: result.kept.add inst.path
+  for inst in p.installs: takeOut(inst, result)
   p.installs = @[]
+  pruneDirs(p)
+
+proc removeSkills*(p: var Project; skills: seq[string]): Report =
+  ## Undo the installs of just these skills.
+  result = Report()
+  var keep: seq[Install] = @[]
+  for inst in p.installs:
+    if inst.skill notin skills: keep.add inst
+    else: takeOut(inst, result)
+  p.installs = keep
   pruneDirs(p)
 
 proc missing*(p: Project): int =

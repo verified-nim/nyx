@@ -11,7 +11,6 @@ const
 let
   Bold* = ansiStyleCode(styleBright)
   White* = ansiForegroundColorCode(rgb(238, 238, 232))
-  Bone* = ansiForegroundColorCode(rgb(196, 192, 186))
   Ash* = ansiForegroundColorCode(rgb(120, 118, 114))
   Gold* = ansiForegroundColorCode(rgb(230, 184, 40))
   Ember* = ansiForegroundColorCode(rgb(255, 128, 8))
@@ -20,10 +19,6 @@ let
 proc interactive*(): bool =
   ## False when stdout is not a terminal: no animation, no redraws.
   terminal.isatty(stdout)
-
-proc sleepMs*(ms: int) =
-  if not interactive(): return
-  os.sleep(ms)
 
 proc put*(s: string) =
   stdout.write s
@@ -61,18 +56,19 @@ proc wordmark(): seq[string] =
 
 proc ignite(mark: seq[string]; ms: int) =
   ## Fade the wordmark up from ember to full fire.
-  let steps = if interactive(): 10 else: 1
+  const steps = 10
   for s in 1 .. steps:
     if s > 1:  # back to the start of the wordmark's first line
       cursorUp(stdout, mark.len)
       setCursorXPos(stdout, 0)
-    let k = if steps == 1: 1.0 else: (float(s) / float(steps)) * (float(s) / float(steps))
+    let k = (float(s) / float(steps)) * (float(s) / float(steps))
     for i in 0 ..< mark.len:
       put "  " & markColor(MarkColors[min(i, MarkColors.high)], k) & mark[i] & Reset & "\n"
-    sleepMs(ms div steps)
+    os.sleep(ms div steps)
 
 proc banner*() =
-  ## Header for every command: just the burning wordmark.
+  ## Header for every command on a terminal: just the burning wordmark.
+  if not interactive(): return
   hideCursor(stdout)
   line()
   ignite(wordmark(), 250)

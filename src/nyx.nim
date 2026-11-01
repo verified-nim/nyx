@@ -106,7 +106,7 @@ proc refresh(c: var Ctx; changes: var Changes): bool =
   ## in every project up to date: the clone and its applied revision are
   ## shared. Records the check time either way.
   let store = skillsDir(c.data)
-  let before = discover(store).names
+  let before = discover(store)
   let fresh = not dirExists($store)
   let oldRev = c.st.repoRev
   var output = ""
@@ -120,6 +120,9 @@ proc refresh(c: var Ctx; changes: var Changes): bool =
     r = repo.clone(repoUrl(), store, output)
   else:
     r = pull(store, output)
+    for name in editedSkills(store):
+      warn name & dim("  edited in the clone every project shares")
+      line "    " & dim("to discard: git -C " & display(store) & " checkout -- " & name)
   c.st.lastCheck = now()
   if r != Done:
     explain(r, output, fresh)
@@ -145,7 +148,7 @@ proc refresh(c: var Ctx; changes: var Changes): bool =
   save(c)
 
   if not fresh:
-    for name in discover(store).names:
+    for name in discover(store):
       if name notin before: inc changes.added
       elif name in changed: changes.updated.add name
   result = true
@@ -162,16 +165,22 @@ proc report(p: Project; changes: Changes) =
   done("skills", summary)
 
 proc showSkills(c: Ctx; p: Project) =
-  let catalog = discover(skillsDir(c.data)).names
+  let catalog = discover(skillsDir(c.data))
   for name in p.skills:
     # An empty catalog is a missing clone, which says nothing about the name.
     if catalog.len == 0 or name in catalog: ok name
     else: warn name & dim("  no longer in the catalog")
   let gone = missing(p)
   if gone > 0:
-    warn $gone & " installs changed or missing" & dim("  rerun nyx install to restore them")
+    warn $gone & " installs changed or missing" & dim("  nyx install SKILL restores them")
 
 # --- commands ----------------------------------------------------------------
+
+proc showChanges(c: Ctx; rep: Report) =
+  for d in rep.removed:
+    line "  " & Blood & "- " & Reset & c.rel(d) & "  " & dim("removed")
+  for d in rep.collisions: warn c.rel(d) & dim("  exists, not nyx's; left alone")
+  for d in rep.kept: warn c.rel(d) & dim("  modified; left alone")
 
 proc status(c: var Ctx) =
   ## The bare command: update when due and show this project's skills.
@@ -201,7 +210,7 @@ proc chooseTargets(c: Ctx; recorded: seq[string]): seq[string] =
   if result.len == 0: result = @["agents", "claude"]
 
 proc installSkills(c: var Ctx; wanted: seq[string]) =
-  ## Make this project's skills exactly `wanted`.
+  ## Add `wanted` to this project's skills and restore any that went missing.
   banner()
   notes(c)
   if wanted.len == 0:
@@ -216,8 +225,10 @@ proc installSkills(c: var Ctx; wanted: seq[string]) =
     line()
     quit(1)
 
-  let catalog = discover(store).names
-  var chosen: seq[string] = @[]
+  let catalog = discover(store)
+  let idx = c.st.find(c.root)
+  var p = if idx >= 0: c.st.projects[idx] else: Project(root: c.root)
+  var chosen = p.skills
   var unknown = false
   for name in wanted:
     if name notin catalog:
@@ -231,8 +242,6 @@ proc installSkills(c: var Ctx; wanted: seq[string]) =
     line()
     quit(1)
 
-  let idx = c.st.find(c.root)
-  var p = if idx >= 0: c.st.projects[idx] else: Project(root: c.root)
   p.targets = chooseTargets(c, p.targets)
   let dirs = skillDirs(p.targets)
   let rep = sync(p, store, dirs, chosen)
@@ -246,11 +255,16 @@ proc installSkills(c: var Ctx; wanted: seq[string]) =
     if how.len > 0:
       p.skills.add name
       done(name, how)
-  for d in rep.removed:
-    line "  " & Blood & "- " & Reset & c.rel(d) & "  " & dim("removed")
-  for d in rep.collisions: warn c.rel(d) & dim("  exists, not nyx's; left alone")
-  for d in rep.kept: warn c.rel(d) & dim("  modified; left alone")
-  for d in rep.failed: fail c.rel(d) & dim("  could not install")
+  showChanges(c, rep)
+  var short = false
+  for d in rep.failed:
+    if $lastPathPart(d) in catalog:
+      fail c.rel(d) & dim("  could not install")
+      short = true
+    else:
+      warn c.rel(d) & dim("  no longer in the catalog; not restored")
+  for name in wanted:
+    if name notin p.skills: short = true
 
   if p.installs.len > 0 or p.dirs.len > 0:
     if idx >= 0: c.st.projects[idx] = p
@@ -264,7 +278,7 @@ proc installSkills(c: var Ctx; wanted: seq[string]) =
   line "  " & Bold & Gold & "ready" & Reset &
     dim("  " & $p.skills.len & " skills in " & places.join(", "))
   line()
-  if rep.failed.len > 0: quit(1)
+  if short: quit(1)
 
 proc update(c: var Ctx) =
   banner()
@@ -279,7 +293,40 @@ proc update(c: var Ctx) =
     showSkills(c, c.st.projects[idx])
   line()
 
-proc remove(c: var Ctx) =
+proc remove(c: var Ctx; names: seq[string]) =
+  ## Take `names` out of this project's skills.
+  banner()
+  notes(c)
+  if names.len == 0:
+    fail "name the skills to remove" & dim("  nyx clear removes them all")
+    line()
+    quit(1)
+  let idx = c.st.find(c.root)
+  var p = if idx >= 0: c.st.projects[idx] else: Project(root: c.root)
+  var unknown = false
+  for name in names:
+    if name notin p.skills:
+      fail name & dim("  not installed")
+      unknown = true
+  if unknown:
+    line "  " & dim("nothing changed")
+    line()
+    quit(1)
+  field "project", White & display(c.root)
+  let rep = removeSkills(p, names)
+  var left: seq[string] = @[]
+  for name in p.skills:
+    if name notin names: left.add name
+  p.skills = left
+  if p.installs.len > 0: c.st.projects[idx] = p
+  else: c.st.projects.delete(idx)
+  save(c)
+  showChanges(c, rep)
+  line()
+  showSkills(c, p)
+  line()
+
+proc clear(c: var Ctx) =
   banner()
   notes(c)
   let idx = c.st.find(c.root)
@@ -287,12 +334,12 @@ proc remove(c: var Ctx) =
     line "  " & dim("nothing to remove here")
     line()
     return
+  field "project", White & display(c.root)
   var p = c.st.projects[idx]
   let rep = removeAll(p)
   c.st.projects.delete(idx)
   save(c)
-  done("removed", $rep.removed.len & " installs")
-  for d in rep.kept: warn c.rel(d) & dim("  modified; left alone")
+  showChanges(c, rep)
   line()
 
 proc main =
@@ -302,14 +349,15 @@ proc main =
     return
   let opts = cliapp"""nyx - skills for your coding agents
 
-Usage: nyx [install SKILL...|update|remove]
+Usage: nyx [install SKILL...|remove SKILL...|clear|update]
 
   Run `nyx` alone to see this project's skills; it updates them when due.
 
 Commands:
-  install SKILL...  Make this project's skills exactly these
+  install SKILL...  Add skills to this project
+  remove SKILL...   Remove skills from this project
+  clear             Remove all of this project's skills
   update            Update skills now
-  remove            Remove this project's skills
 
 Options:
   -h, --help  Show this help
@@ -318,7 +366,8 @@ Options:
   case opts.command
   of cmdInstall: installSkills(c, opts.skill)
   of cmdUpdate: update(c)
-  of cmdRemove: remove(c)
+  of cmdRemove: remove(c, opts.skill)
+  of cmdClear: clear(c)
   else: discard
 
 when isMainModule:

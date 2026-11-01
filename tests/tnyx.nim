@@ -263,28 +263,6 @@ proc testRoot(tmp: Path) {.raises.} =
   check(projectRoot(inner / path("src") / path("deep")) == path(expandFilename($inner)),
         "nearest inner repository wins over outer repository")
 
-proc testDescription() =
-  for (text, desc) in [
-    ("", ""),
-    ("description: outside frontmatter", ""),
-    ("---\n---\ndescription: outside frontmatter", ""),
-    (" \t--- \nname: x\ndescription \t:  plain text \t\n---", "plain text"),
-    ("---\ndescription:", ""),
-    ("---\ndescription: \"\"", ""),
-    ("---\ndescription: \"  quoted text  \"\n---", "  quoted text  "),
-    ("---\ndescription: 'quoted text'\n---", "quoted text"),
-    ("---\ndescription: 'It''s useful'\n---", "It''s useful"),
-    ("---\ndescription: text # comment\n---", "text # comment"),
-    ("---\n description: ignored\ndescription-x: ignored\n---", ""),
-    ("---\ndescription: >-\n  folded\n\ttext\nname: end", "folded text"),
-    ("---\ndescription: |\n  literal\n  text\n---", "literal text"),
-    ("---\ndescription:\n  \n  folded\n   \n  text\n  \n---", "folded  text"),
-    ("---\ndescription: >\n  first\n\n  ignored", "first"),
-    ("---\r\ndescription: >\r\n  CRLF\r\n  text\r\n---", "CRLF text"),
-    ("---\rdescription: CR text\r---", "CR text"),
-    ("---\ndescription: unterminated", "unterminated")]:
-    check(readDescription(text) == desc, "description: " & text)
-
 proc testCatalog(tmp: Path) {.raises.} =
   let store = tmp / path("store")
   makeStore(store)
@@ -292,10 +270,7 @@ proc testCatalog(tmp: Path) {.raises.} =
   # A broken directory link must not hide valid catalog entries.
   createSymlink(store / path("missing-skill"), store / path("broken"))
   let skills = discover(store)
-  check(skills.names == @["alpha", "beta", "gamma"], "discovery: " & skills.names.join(","))
-  check(skills[0].description == "Alpha does things. More text.", "description read")
-  check(skills[1].description == "", "missing frontmatter falls back")
-  check(skills[2].description == "Folded text", "folded description")
+  check(skills == @["alpha", "beta", "gamma"], "discovery: " & skills.join(","))
   check(discover(tmp / path("nope")).len == 0, "missing catalog is empty")
   for bad in ["..", "../x", "/etc", "a/b", "a\\b", ".git", "", "-x"]:
     check(not validName(bad), "rejects name " & bad)
@@ -306,35 +281,15 @@ proc testCatalog(tmp: Path) {.raises.} =
   for name in ["charlie", "alpha", "bravo"]:
     mkfile(unsorted / path(name) / path("SKILL.md"), skillMd(name))
   let ordered = discover(unsorted)
-  check(ordered.names == @["alpha", "bravo", "charlie"],
+  check(ordered == @["alpha", "bravo", "charlie"],
         "discovery sorts deliberately unsorted creation order")
-  for s in ordered:
-    check(s.description == s.name, "sorted description belongs to directory " & s.name)
   mkfile(unsorted / path("0-first") / path("SKILL.md"), "---\nname: other\n---\n")
   mkfile(unsorted / path("Z-last") / path("SKILL.md"), skillMd("'quoted'"))
   mkfile(unsorted / path("nested") / path("child") / path("SKILL.md"),
     skillMd("not a direct child"))
   let mixed = discover(unsorted)
-  check(mixed.names == @["0-first", "Z-last", "alpha", "bravo", "charlie"],
+  check(mixed == @["0-first", "Z-last", "alpha", "bravo", "charlie"],
         "discovery keeps directory identity, flat scope and ASCII ordering")
-  check(mixed[0].description == "" and mixed[1].description == "quoted",
-        "sorted missing and quoted descriptions")
-  let unreadable = unsorted / path("bravo") / path("SKILL.md")
-  let perms = getFilePermissions(unreadable)
-  try:
-    setFilePermissions(unreadable, {})
-    var denied = false
-    try:
-      discard readFile($unreadable)
-    except:
-      denied = true
-    check(denied, "unreadable description fixture requires permission enforcement")
-    let partial = discover(unsorted)
-    check(partial.names == mixed.names, "unreadable description keeps the skill and ordering")
-    check(partial[3].description == "" and partial[4].description == "charlie",
-          "unreadable description is empty; later descriptions still read")
-  finally:
-    setFilePermissions(unreadable, perms)
 
 proc testNames() =
   for s in ["a", "Z", "0", "9", "a_B-09", repeat('a', 63), repeat('Z', 64),
@@ -364,7 +319,7 @@ proc testInstall(tmp: Path) {.raises.} =
   check(r.collisions == @[root / path(".claude/skills/alpha")], "collision reported")
   check(readFile($(root / path(".claude/skills/alpha/SKILL.md"))) == "user's own alpha",
         "unmanaged destination untouched")
-  check(r.placed.len == 3 and p.installs.len == 3, "other destinations placed")
+  check(p.installs.len == 3, "other destinations placed")
   check(symlinkExists(root / path(".pi/skills/beta")), "linked on unix")
   var created: seq[string] = @[]
   for dir in p.dirs: created.add $dir
@@ -599,7 +554,6 @@ proc main() =
     testState(tmp)
     testTargets(tmp)
     testStale()
-    testDescription()
     testNames()
     testCatalog(tmp)
     testInstall(tmp)
