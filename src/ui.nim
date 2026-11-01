@@ -29,7 +29,7 @@ proc banner*() =
   ## Header for every command on a terminal: the wordmark.
   if not interactive(): return
   line()
-  for l in Logo.strip(leading = false).splitLines(): line "  " & Bold & l
+  put Bold & Logo & Reset
   line()
 
 # --- output helpers -------------------------------------------------------
