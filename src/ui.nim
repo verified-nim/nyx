@@ -4,7 +4,7 @@
 import std/[syncio, strutils, terminal]
 
 const
-  Logo = slurp("../assets/logo.txt")
+  Logo = slurp("../assets/logo.ans")
   Reset* = ansiResetCode
 
 let
@@ -26,10 +26,10 @@ proc line*(s = "") =
   put s & Reset & "\n"
 
 proc banner*() =
-  ## Header for every command on a terminal: the wordmark.
+  ## Header for every command on a terminal: the N, Y and X tiles and a tagline.
   if not interactive(): return
   line()
-  put Bold & Logo & Reset
+  put Logo & Reset
   line()
 
 # --- output helpers -------------------------------------------------------
