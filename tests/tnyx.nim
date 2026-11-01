@@ -7,7 +7,7 @@
 ## root case.
 
 import std/[paths, symlinks, syncio, strutils, os, dirs, files, osproc, streams, envvars, tempfiles, opt]
-import ../src/[state, catalog, repo, install, targets, ui]
+import ../src/[state, catalog, repo, install, targets]
 import paths, explain
 
 var failures = 0   # single-threaded test program
@@ -121,42 +121,6 @@ proc testTargets(tmp: Path) {.raises.} =
       setFilePermissions(exe, {fpUserRead, fpUserWrite, fpUserExec})
     check(detect(Targets[byId("continue")], bare, home), "Continue executable on PATH")
 
-    # Global skill directory resolution
-    putEnv("XDG_CONFIG_HOME", $config)
-    check(globalSkillDir(Targets[byId("crush")], home) == config / path("crush/skills"),
-          "Crush honors XDG_CONFIG_HOME")
-    check(globalSkillDir(Targets[byId("opencode")], home) == config / path("opencode/skills"),
-          "OpenCode honors XDG_CONFIG_HOME")
-    check(globalSkillDir(Targets[byId("windsurf")], home) == config / path("devin/skills"),
-          "Windsurf honors XDG_CONFIG_HOME")
-    check(globalSkillDir(Targets[byId("claude")], home) == home / path(".claude/skills"),
-          "Claude stays under home despite XDG_CONFIG_HOME")
-    check(globalSkillDir(Targets[byId("agy")], home) == home / path(".gemini/config/skills"),
-          "Antigravity stays under home despite XDG_CONFIG_HOME")
-    check(globalSkillDir(Targets[byId("amp")], home) == home / path(".config/agents/skills"),
-          "Amp's .config is literal, not XDG_CONFIG_HOME")
-    check(globalSkillDir(Targets[byId("codex")], home) == home / path(".agents/skills"),
-          "Codex stays under home")
-    check(globalSkillDirs(@["codex", "agents", "goose"], home) == @[home / path(".agents/skills")],
-          "shared home targets deduplicate")
-
-    putEnv("XDG_CONFIG_HOME", "")
-    check(globalSkillDir(Targets[byId("crush")], home) == home / path(".config/crush/skills"),
-          "Crush falls back to ~/.config")
-    check(globalSkillDir(Targets[byId("opencode")], home) == home / path(".config/opencode/skills"),
-          "OpenCode falls back to ~/.config")
-    check(globalSkillDir(Targets[byId("windsurf")], home) == home / path(".config/devin/skills"),
-          "Windsurf falls back to ~/.config")
-    putEnv("XDG_CONFIG_HOME", " \t ")
-    check(globalSkillDir(Targets[byId("crush")], home) == home / path(".config/crush/skills"),
-          "blank XDG_CONFIG_HOME falls back to ~/.config")
-    putEnv("CLAUDE_CONFIG_DIR", $(config / path("claude")))
-    check(globalSkillDir(Targets[byId("claude")], home) == config / path("claude/skills"),
-          "Claude honors CLAUDE_CONFIG_DIR")
-
-    # Global detection does not consider project markers
-    check(not detect(Targets[byId("agents")], path(""), home), "empty root ignores project markers")
-    check(detect(Targets[byId("crush")], path(""), home), "empty root detects home markers")
   finally:
     for (key, had, value) in saved:
       if had: putEnv(key, value)
@@ -244,23 +208,19 @@ proc testState(tmp: Path) {.raises.} =
   writeFile($(statePath(data)), "[1]")
   check(loadState(data).corrupt, "non-object document is not trusted")
 
+  # A user-scope entry written by nyx 0.2 survives and never matches a project.
   var gs = newState()
-  check(gs.findGlobal() == -1, "fresh state has no global project")
   gs.projects.add Project(global: true, targets: @["crush"], skills: @["alpha"],
     installs: @[Install(path: path("/home/.config/crush/skills/alpha"), skill: "alpha", mode: Link,
                         source: path("/s/alpha"))],
     dirs: @[path("/home/.config/crush/skills")])
   gs.projects.add Project(root: path("/p"), targets: @["claude"], skills: @["alpha"])
-  check(gs.findGlobal() == 0, "findGlobal locates index 0")
   check(gs.find(path("/p")) == 1, "find locates regular project at index 1")
   check(gs.find(path("")) == -1, "find never matches the global entry")
   saveState(data, gs)
   let gback = loadState(data)
   check(not gback.corrupt, "global project round trip parses")
-  let globalState = gback.state
-  check(globalState.findGlobal() == 0 and globalState.find(path("/p")) == 1,
-        "round trip preserves global project and project together")
-  check(globalState.projects[0].global and not globalState.projects[1].global,
+  check(gback.state.projects[0].global and not gback.state.projects[1].global,
         "global flag survives the round trip")
 
 proc testStale() =
@@ -499,141 +459,6 @@ proc testRetargetedLink(tmp: Path) {.raises.} =
     readFile($(other / path("SKILL.md"))) == "user's target",
         "resync preserves user link and target")
 
-proc testGlobalInstall(tmp: Path) {.raises.} =
-  let store = tmp / path("global-store")
-  makeStore(store)
-  let home = tmp / path("user-home")
-  let cfg = tmp / path("user-cfg")
-  createDir(home)
-  createDir(cfg)
-  var saved: seq[(string, bool, string)] = @[]
-  for key in ["XDG_CONFIG_HOME"]:
-    saved.add (key, existsEnv(key), getEnv(key))
-  putEnv("XDG_CONFIG_HOME", $cfg)
-  defer:
-    for (key, had, value) in saved:
-      if had: putEnv(key, value)
-      else: delEnv(key)
-
-  let crushDir = globalSkillDir(Targets[byId("crush")], home)
-  let claudeDir = globalSkillDir(Targets[byId("claude")], home)
-  check(crushDir == cfg / path("crush/skills"), "global crush dir under XDG")
-  check(claudeDir == home / path(".claude/skills"), "global claude dir under home")
-
-  var g = Project(global: true)
-  var r = sync(g, store, @[crushDir, claudeDir], @["alpha"])
-  check(r.placed.len == 2 and g.installs.len == 2, "global skills installed")
-  check(symlinkExists(cfg / path("crush/skills/alpha")), "crush global link exists")
-  check(symlinkExists(home / path(".claude/skills/alpha")), "claude global link exists")
-
-  # Project install in another directory
-  let projRoot = tmp / path("my-project")
-  createDir(projRoot)
-  var p = Project(root: projRoot)
-  var pr = sync(p, store, @[path(".crush/skills")], @["alpha"])
-  check(pr.placed.len == 1 and p.installs.len == 1, "project skill installed")
-  check(symlinkExists(projRoot / path(".crush/skills/alpha")), "project link exists")
-
-  # Removing project does not remove global
-  let prep = removeAll(p)
-  check(prep.removed.len == 1, "project removed")
-  check(not symlinkExists(projRoot / path(".crush/skills/alpha")), "project link removed")
-  check(symlinkExists(cfg / path("crush/skills/alpha")), "global crush link remains")
-  check(symlinkExists(home / path(".claude/skills/alpha")), "global claude link remains")
-
-  # Removing global cleans up global and prunes empty dirs
-  let grep = removeAll(g)
-  check(grep.removed.len == 2, "global removed")
-  check(not symlinkExists(cfg / path("crush/skills/alpha")), "global crush link removed")
-  check(not symlinkExists(home / path(".claude/skills/alpha")), "global claude link removed")
-  check(not dirExists($(cfg / path("crush"))), "empty crush dir pruned")
-  check(not dirExists($(home / path(".claude"))), "empty claude dir pruned")
-
-proc testCliGlobal() {.raises.} =
-  let p1 = startProcess("bin/nyx", args = @["-g"], options = {poUsePath, poStdErrToStdOut})
-  defer: close(p1)
-  check(waitForExit(p1, 5000) != 0, "nyx -g without subcommand fails")
-
-  let p2 = startProcess("bin/nyx", args = @["--global"], options = {poUsePath, poStdErrToStdOut})
-  defer: close(p2)
-  check(waitForExit(p2, 5000) != 0, "nyx --global without subcommand fails")
-
-proc prompt(mode: string) =
-  # Child mode: call the real prompts with pipe-backed stdin/stdout. Keeping
-  # this in the test executable avoids compiling a second fixture program.
-  if mode == "yes" or mode == "no":
-    let answer = confirm("Proceed?", mode == "yes")
-    echo "answer=", answer
-  else:
-    let items = @[Choice(label: "first"), Choice(label: "second"),
-                  Choice(label: "third")]
-    var sel = @[false, true, false]
-    choose(items, sel, minOne = mode == "required")
-    var answer = ""
-    for selected in sel: answer.add(if selected: '1' else: '0')
-    echo "answer=", answer
-
-proc runPrompt(mode, input: string): (int, string) {.raises.} =
-  let p = startProcess(getAppFilename(), args = @["--prompt", mode],
-                       options = {poStdErrToStdOut})
-  defer: close(p)
-  p.inputStream.write(input)
-  close(p.inputStream)  # Deliver EOF, including for abort tests.
-  # These three-choice scripts emit less than a pipe buffer. Bound the wait
-  # before reading so a prompt regression cannot hang the test indefinitely.
-  let code = waitForExit(p, 5000)
-  let output = p.outputStream.readAll()
-  result = (code, output)
-
-proc testPrompts() {.raises.} =
-  # Check prompt answers and rendered output with piped input.
-  for (mode, input, answer) in [
-      ("yes", "\n", "true"), ("no", "\n", "false"),
-      ("no", "  YeS  \n", "true"), ("yes", "No\n", "false"),
-      ("yes", "unrecognized\n", "false")]:
-    let (code, output) = runPrompt(mode, input)
-    let hint = if mode == "yes": "[Y/n]" else: "[y/N]"
-    check(code == 0 and output.endsWith("answer=" & answer & "\n"),
-          "confirm " & mode & " input [" & input & "]: " & output)
-    check("Proceed? " & hint in output, "confirm displays default hint")
-
-  for (mode, input, answer) in [
-      ("optional", "\n", "010"),
-      ("optional", "1, 2 3\n\n", "101"),
-      ("optional", "a\n\n", "111"), ("optional", "n\n\n", "000"),
-      ("optional", "garbage 0 -1 99\n\n", "010"),
-      ("optional", ",,1,,\t 2\v3\f,,\n\n", "101"),
-      ("optional", ",, \t,,\n\n", "010"),
-      ("optional", "+1 02 +3\n\n", "101"),
-      ("optional", "1_ 2__ +0_3___\n\n", "101"),
-      ("optional", "1,1 2 2 +3 3_\n\n", "010"),
-      ("optional", "1x 2.0 3_foo _1 +_2 + - --1 0x1 1\x002\n\n", "010"),
-      ("optional", "2147483647 2147483648 4294967297 -4294967295\n\n", "010"),
-      ("optional", "9223372036854775807 9223372036854775808 " &
-        "-9223372036854775808 -9223372036854775809\n\n", "010"),
-      ("optional", "1 99999999999999999999999999999 3\n\n", "111"),
-      ("optional", "1 9_223_372_036_854_775_808 3\n\n", "111"),
-      ("optional", "A N a,1 n\n\n", "110"),
-      ("optional", " a \n2\nn\n+3\n\n", "001"),
-      ("required", "n\n\n3\n\n", "001")]:
-    let (code, output) = runPrompt(mode, input)
-    check(code == 0 and output.endsWith("answer=" & answer & "\n"),
-          "choose " & mode & " input [" & input & "]: " & output)
-    check("first" in output and "third" in output and "[x]" in output and
-          "[ ]" in output and "toggle 1-3, a/n, enter to accept" in output,
-          "choose draws choices and instructions")
-    check(("pick at least one" in output) == (mode == "required"),
-          "empty required selection warns and retries")
-
-  let (code, output) = runPrompt("required", "\n")
-  check(code == 0 and output.endsWith("answer=010\n") and "pick at least one" notin output,
-        "required selection accepts its selected default")
-
-  for (mode, input) in [("yes", ""), ("optional", "1\n"), ("required", "n\n\n")]:
-    let (code, output) = runPrompt(mode, input)
-    check(code == 1 and "aborted" in output and "answer=" notin output,
-          "EOF aborts " & mode & " without returning an answer: " & output)
-
 proc testRepo(tmp: Path) {.raises.} =
   var o = ""
   # No access: a repository that is not there.
@@ -765,9 +590,6 @@ proc testGit(tmp: Path) {.raises.} =
     for (key, value) in saved: putEnv(key, value)
 
 proc main() =
-  if paramCount() == 2 and paramStr(1) == "--prompt":
-    prompt(paramStr(2))
-    return
   var tmp = path("")
   try:
     tmp = createTempDir("nyx-test-", "")
@@ -781,10 +603,7 @@ proc main() =
     testNames()
     testCatalog(tmp)
     testInstall(tmp)
-    testGlobalInstall(tmp)
     testRetargetedLink(tmp)
-    testPrompts()
-    testCliGlobal()
     testGit(tmp)
   except ErrorCode as e:
     fail("raised " & $e)

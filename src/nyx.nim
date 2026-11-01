@@ -4,13 +4,19 @@
 import std/[appdirs, paths, syncio, strutils, os, dirs, smartcli]
 import state, targets, catalog, repo, install, ui
 
+const
+  PageUrl = "https://verified-nim.github.io/skills.html"
+
 type
   Ctx = object
     data: Path     ## NYX data directory
-    root: Path     ## canonical project root; unset when `global`
-    global: bool   ## user-level skill directories instead of the project
+    root: Path     ## canonical project root
     st: State
     corrupt: bool  ## state.json was unreadable and set aside
+
+  Changes = object
+    updated: seq[string]  ## catalog skills changed by the last refresh
+    added: int            ## skills new to the catalog
 
 # --- helpers ----------------------------------------------------------------
 
@@ -37,13 +43,6 @@ proc rel(c: Ctx; file: Path): string =
   elif p[n] in {DirSep, AltSep}: p.substr(n + 1)
   else: p
 
-proc shown(c: Ctx; file: Path): string =
-  ## A path as the command reports it: relative to the project, or to `~`.
-  if c.global: display(file) else: c.rel(file)
-
-proc scope(c: Ctx): string =
-  if c.global: "user scope" else: "project"
-
 proc ago(t: int): string =
   if t == 0: return "never"
   let hours = (now() - t) div 3600
@@ -52,16 +51,6 @@ proc ago(t: int): string =
   elif hours < 48: "1 day ago"
   else: $(hours div 24) & " days ago"
 
-proc short(s: string; n: int): string =
-  ## First sentence of `s`, cut on a word boundary to at most `n` chars.
-  result = s
-  let stop = result.find('.')
-  if stop > 0: result = result.substr(0, stop - 1)
-  if result.len > n:
-    var cut = n
-    while cut > 0 and result[cut] != ' ': dec cut
-    result = result.substr(0, (if cut > 0: cut else: n) - 1)
-
 proc save(c: Ctx) =
   try:
     saveState(c.data, c.st)
@@ -69,18 +58,13 @@ proc save(c: Ctx) =
     fail "cannot write " & $statePath(c.data)
     quit(1)
 
-proc context(global = false): Ctx =
-  result = Ctx(data: dataDir(), global: global)
-  if global:
-    if appdirs.getHomeDir() == path(""):
-      fail "cannot resolve the home directory"
-      quit(1)
-  else:
-    try:
-      result.root = projectRoot(path("."))
-    except:
-      fail "cannot resolve the current directory"
-      quit(1)
+proc context(): Ctx =
+  result = Ctx(data: dataDir())
+  try:
+    result.root = projectRoot(path("."))
+  except:
+    fail "cannot resolve the current directory"
+    quit(1)
   let loaded = loadState(result.data)
   result.st = loaded.state
   result.corrupt = loaded.corrupt
@@ -89,18 +73,9 @@ proc notes(c: Ctx) =
   if c.corrupt:
     warn "state was unreadable, starting fresh" & dim("  (kept as state.json.bad)")
 
-proc project(c: Ctx): int =
-  if c.global: c.st.findGlobal() else: c.st.find(c.root)
-
-proc skillDirs(c: Ctx; ids: seq[string]): seq[Path] =
-  if c.global: globalSkillDirs(ids, appdirs.getHomeDir()) else: skillDirs(ids)
-
-proc targetNames(ids: seq[string]): string =
-  var names: seq[string] = @[]
-  for id in ids:
-    let i = byId(id)
-    if i >= 0: names.add Targets[i].name
-  result = names.join(", ")
+proc pointToPage() =
+  line "  " & dim("pick your skills at ") & PageUrl
+  line "  " & dim("then run the command it gives you in your project")
 
 # --- updating ---------------------------------------------------------------
 
@@ -126,9 +101,10 @@ proc explain(r: GitResult; output: string; setup: bool) =
     let message = firstLine(output)
     if message.len > 0: line "    " & dim(message)
 
-proc refresh(c: var Ctx; setup = false): bool =
+proc refresh(c: var Ctx; changes: var Changes): bool =
   ## Clone or fast-forward the skills repository, then bring copied installs
-  ## in every project up to date. Records the check time either way.
+  ## in every project up to date: the clone and its applied revision are
+  ## shared. Records the check time either way.
   let store = skillsDir(c.data)
   let before = discover(store).names
   let fresh = not dirExists($store)
@@ -146,7 +122,7 @@ proc refresh(c: var Ctx; setup = false): bool =
     r = pull(store, output)
   c.st.lastCheck = now()
   if r != Done:
-    explain(r, output, setup)
+    explain(r, output, fresh)
     save(c)
     return false
 
@@ -156,7 +132,6 @@ proc refresh(c: var Ctx; setup = false): bool =
   # Recopy conservatively; an unchanged, known revision needs no work.
   let all = oldRev.len == 0 or newRev.len == 0 or
     (oldRev != newRev and changed.len == 0)
-  let after = discover(store)
   var complete = true
   for p in mitems(c.st.projects):
     for inst in mitems(p.installs):
@@ -169,200 +144,179 @@ proc refresh(c: var Ctx; setup = false): bool =
   if complete and newRev.len > 0: c.st.repoRev = newRev
   save(c)
 
-  if fresh:
-    done("skills", $after.len & " available")
-  else:
-    var updated: seq[string] = @[]
-    var added = 0
-    for s in after:
-      if s.name notin before: inc added
-      elif s.name in changed: updated.add s.name
-    var summary = $updated.len & " updated, " &
-      $(after.len - updated.len - added) & " current"
-    if added > 0: summary.add ", " & $added & " new"
-    done("skills", summary)
-    for name in updated: done(name, "updated")
+  if not fresh:
+    for name in discover(store).names:
+      if name notin before: inc changes.added
+      elif name in changed: changes.updated.add name
   result = true
 
-# --- selection ---------------------------------------------------------------
+proc report(p: Project; changes: Changes) =
+  ## What a refresh meant for this project's skills.
+  var updated = 0
+  for name in p.skills:
+    if name in changes.updated:
+      done(name, "updated")
+      inc updated
+  var summary = $updated & " updated, " & $(p.skills.len - updated) & " current"
+  if changes.added > 0: summary.add ", " & $changes.added & " new in the catalog"
+  done("skills", summary)
 
-proc pickTargets(c: Ctx; p: Project; configured: bool): seq[string] =
-  let home = appdirs.getHomeDir()
-  var items: seq[Choice] = @[]
-  var sel: seq[bool] = @[]
-  for t in Targets:
-    let detail = if c.global: display(globalSkillDir(t, home)) else: $t.skillDir
-    items.add Choice(label: t.name, detail: detail)
-    sel.add(if configured: t.id in p.targets else: detect(t, p.root, home))
-  choose(items, sel, minOne = true)
-  result = @[]
-  for i in 0..<Targets.len:
-    if sel[i]: result.add Targets[i].id
-
-proc pickSkills(skills: seq[Skill]; chosen: seq[string]): seq[string] =
-  var items: seq[Choice] = @[]
-  var sel: seq[bool] = @[]
-  for s in skills:
-    items.add Choice(label: s.name, detail: short(s.description, 60))
-    sel.add(s.name in chosen)
-  choose(items, sel, minOne = true)
-  result = @[]
-  for i in 0..<skills.len:
-    if sel[i]: result.add skills[i].name
+proc showSkills(c: Ctx; p: Project) =
+  let catalog = discover(skillsDir(c.data)).names
+  for name in p.skills:
+    # An empty catalog is a missing clone, which says nothing about the name.
+    if catalog.len == 0 or name in catalog: ok name
+    else: warn name & dim("  no longer in the catalog")
+  let gone = missing(p)
+  if gone > 0:
+    warn $gone & " installs changed or missing" & dim("  rerun nyx install to restore them")
 
 # --- commands ----------------------------------------------------------------
 
-proc wizard(c: var Ctx) =
+proc status(c: var Ctx) =
+  ## The bare command: update when due and show this project's skills.
   banner()
   notes(c)
-  if c.global:
-    field "scope", White & "user"
-  else:
-    field "project", White & display(c.root)
-  line()
-
-  let store = skillsDir(c.data)
-  if not dirExists($store):
-    line "  " & dim("nyx needs access to the skills repository")
-    if not refresh(c, setup = true):
-      line()
-      quit(1)
-    line()
-  let skills = discover(store)
-  if skills.len == 0:
-    fail "no skills found in " & display(store)
-    quit(1)
-
-  let idx = project(c)
-  var p = if idx >= 0: c.st.projects[idx]
-          else: Project(root: c.root, global: c.global)
-
-  heading "targets"
-  let ids = pickTargets(c, p, configured = idx >= 0)
-  line()
-
-  heading "skills"
-  let chosen = pickSkills(skills, p.skills)
-  line()
-
-  field "targets", targetNames(ids)
-  field "skills", $chosen.len
-  line()
-  if not confirm("install?", true):
-    line "  " & dim("nothing changed")
+  let idx = c.st.find(c.root)
+  if idx < 0:
+    pointToPage()
     line()
     return
+  field "project", White & display(c.root)
+  if isStale(c.st, now()):
+    var changes = Changes()
+    if refresh(c, changes): report(c.st.projects[idx], changes)
+  field "checked", ago(c.st.lastCheck)
+  line()
+  showSkills(c, c.st.projects[idx])
   line()
 
-  p.targets = ids
-  p.skills = chosen
-  let dirs = skillDirs(c, ids)
-  let rep = sync(p, store, dirs, chosen)
-  for s in chosen:
-    var links = 0
-    var copies = 0
-    for inst in p.installs:
-      if inst.skill == s:
-        if inst.mode == Link: inc links else: inc copies
-    if links + copies > 0:
-      let how = if copies == 0: "linked" elif links == 0: "copied" else: "placed"
-      done(s, how & " -> " & $(links + copies) & " targets")
-  for d in rep.removed:
-    line "  " & Blood & "- " & Reset & alignLeft(shown(c, d), 22) & "  " & dim("removed")
-  for d in rep.collisions: warn shown(c, d) & dim("  exists, not nyx's; left alone")
-  for d in rep.kept: warn shown(c, d) & dim("  modified; left alone")
-  for d in rep.failed: fail shown(c, d) & dim("  could not install")
+proc chooseTargets(c: Ctx; recorded: seq[string]): seq[string] =
+  ## Targets already recorded stay, detected ones join. With nothing to go on,
+  ## the two directories most agents read.
+  result = recorded
+  let home = appdirs.getHomeDir()
+  for t in Targets:
+    if t.id notin result and detect(t, c.root, home): result.add t.id
+  if result.len == 0: result = @["agents", "claude"]
 
-  if idx >= 0: c.st.projects[idx] = p
-  else: c.st.projects.add p
-  save(c)
-  line()
-  line "  " & Bold & Gold & "ready" & Reset &
-    dim("  " & $chosen.len & " skills on " & $dirs.len & " targets")
-  line()
-
-proc status(c: var Ctx) =
+proc installSkills(c: var Ctx; wanted: seq[string]) =
+  ## Make this project's skills exactly `wanted`.
   banner()
   notes(c)
-  let p = c.st.projects[project(c)]
-  field "project", White & display(c.root)
-  field "targets", targetNames(p.targets)
-  let gone = missing(p)
-  field "skills", $p.skills.len & " installed" &
-    (if gone > 0: Ember & "  " & $gone & " missing, run nyx setup" else: "")
-  field "checked", ago(c.st.lastCheck)
-  if isStale(c.st, now()):
+  if wanted.len == 0:
+    pointToPage()
     line()
-    if refresh(c): field "state", Gold & "current"
-  else:
-    field "state", Gold & "current"
+    quit(1)
+
+  let store = skillsDir(c.data)
+  let fresh = not dirExists($store)
+  var changes = Changes()
+  if not refresh(c, changes) and fresh:
+    line()
+    quit(1)
+
+  let catalog = discover(store).names
+  var chosen: seq[string] = @[]
+  var unknown = false
+  for name in wanted:
+    if name notin catalog:
+      fail name & dim("  not in the catalog")
+      unknown = true
+    elif name notin chosen:
+      chosen.add name
+  if unknown:
+    line "  " & dim("nothing changed")
+    pointToPage()
+    line()
+    quit(1)
+
+  let idx = c.st.find(c.root)
+  var p = if idx >= 0: c.st.projects[idx] else: Project(root: c.root)
+  p.targets = chooseTargets(c, p.targets)
+  let dirs = skillDirs(p.targets)
+  let rep = sync(p, store, dirs, chosen)
+
+  p.skills = @[]
+  for name in chosen:
+    var how = ""
+    for inst in p.installs:
+      if inst.skill == name:
+        how = if inst.mode == Link: "linked" else: "copied"
+    if how.len > 0:
+      p.skills.add name
+      done(name, how)
+  for d in rep.removed:
+    line "  " & Blood & "- " & Reset & c.rel(d) & "  " & dim("removed")
+  for d in rep.collisions: warn c.rel(d) & dim("  exists, not nyx's; left alone")
+  for d in rep.kept: warn c.rel(d) & dim("  modified; left alone")
+  for d in rep.failed: fail c.rel(d) & dim("  could not install")
+
+  if p.installs.len > 0 or p.dirs.len > 0:
+    if idx >= 0: c.st.projects[idx] = p
+    else: c.st.projects.add p
+  elif idx >= 0:
+    c.st.projects.delete(idx)
+  save(c)
+  var places: seq[string] = @[]
+  for d in dirs: places.add $d
   line()
+  line "  " & Bold & Gold & "ready" & Reset &
+    dim("  " & $p.skills.len & " skills in " & places.join(", "))
+  line()
+  if rep.failed.len > 0: quit(1)
 
 proc update(c: var Ctx) =
   banner()
   notes(c)
-  discard refresh(c)
+  var changes = Changes()
+  let refreshed = refresh(c, changes)
+  let idx = c.st.find(c.root)
+  if idx < 0:
+    pointToPage()
+  else:
+    if refreshed: report(c.st.projects[idx], changes)
+    showSkills(c, c.st.projects[idx])
   line()
 
 proc remove(c: var Ctx) =
   banner()
   notes(c)
-  let idx = project(c)
+  let idx = c.st.find(c.root)
   if idx < 0:
-    line "  " & dim(if c.global: "nothing to remove in user scope" else: "nothing to remove here")
+    line "  " & dim("nothing to remove here")
     line()
     return
   var p = c.st.projects[idx]
-  # One line per agent directory, as in the wizard.
-  var dirs: seq[Path] = @[]
-  for inst in p.installs:
-    let d = parentDir(inst.path)
-    if d notin dirs: dirs.add d
-  for d in dirs:
-    var n = 0
-    for inst in p.installs:
-      if parentDir(inst.path) == d: inc n
-    line "  " & Blood & "- " & Bone & alignLeft(shown(c, d), 22) & "  " & dim($n & " skills")
-  line "  " & Blood & "- " & Bone & alignLeft("nyx record", 22) & "  " & dim(if c.global: "user state" else: "project state")
-  line()
-  if not confirm("remove " & $p.skills.len & " skills from " & $dirs.len & " targets?", false):
-    line "  " & dim("kept")
-    line()
-    return
-  line()
   let rep = removeAll(p)
   c.st.projects.delete(idx)
   save(c)
   done("removed", $rep.removed.len & " installs")
-  for d in rep.kept: warn shown(c, d) & dim("  modified; left alone")
-  line()
-  line "  " & Bold & Blood & "gone" & Reset &
-    (if rep.kept.len == 0: dim("  " & scope(c) & " is clean") else: "")
+  for d in rep.kept: warn c.rel(d) & dim("  modified; left alone")
   line()
 
 proc main =
   if smartcli.paramCount() == 0:
     var c = context()
-    if project(c) >= 0: status(c) else: wizard(c)
+    status(c)
     return
   let opts = cliapp"""nyx - skills for your coding agents
 
-Usage: nyx [setup|update|remove] [-g]
+Usage: nyx [install SKILL...|update|remove]
 
-  Run `nyx` alone to set up this project, or to see its status.
+  Run `nyx` alone to see this project's skills; it updates them when due.
 
 Commands:
-  setup   Set up or reconfigure this project (with -g, user scope)
-  update  Update skills everywhere nyx installed them
-  remove  Remove nyx from this project (with -g, user scope)
+  install SKILL...  Make this project's skills exactly these
+  update            Update skills now
+  remove            Remove this project's skills
 
 Options:
-  -g, --global  Use user-level skill directories instead of this project
-  -h, --help    Show this help
+  -h, --help  Show this help
 """
-  var c = context(opts.global)
+  var c = context()
   case opts.command
-  of cmdSetup: wizard(c)
+  of cmdInstall: installSkills(c, opts.skill)
   of cmdUpdate: update(c)
   of cmdRemove: remove(c)
   else: discard

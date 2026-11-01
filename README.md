@@ -4,8 +4,6 @@ Installs coding-agent skills from a skills repository into the current project, 
 
 Skills are cloned once into nyx's data directory. Each project gets symlinks (or copies, where symlinks are unavailable) into its agent skill directories, so one clone serves every project and updates are a fast-forward away.
 
-![nyx wizard: pick the agent targets and skills to install](assets/wizard.svg)
-
 ## Install
 
 Linux and macOS (installs to `~/.local/bin`):
@@ -40,21 +38,21 @@ Release binaries are built with the native backend (`nimony n -d:release -o:bin/
 
 ## Usage
 
+Pick your skills on the [skill table](https://verified-nim.github.io/skills.html); it gives you the install command. Run it in your project:
+
 ```sh
-nyx             # set up this project, or show its status if already set up
-nyx setup       # set up or reconfigure this project
-nyx update      # update skills in every project and the user scope
-nyx remove      # remove nyx from this project
-nyx setup -g    # set up or reconfigure user-level skill directories
-nyx remove -g   # remove nyx from user-level skill directories
-nyx -h          # help
+nyx install nim-testing nim-style-guide  # make this project's skills exactly these
+nyx                                      # show them, updating when a check is due
+nyx update                               # update now
+nyx remove                               # remove this project's skills
+nyx -h                                   # help
 ```
 
-Run `nyx` in a repository root. The project is keyed by the nearest enclosing directory holding a `.git` entry. Pass `-g` or `--global` to work on the user's home skill directories instead of this project.
+`install` has no flags and asks no questions. Skills not in the list that nyx installed earlier are removed; an unknown name changes nothing. The project is the nearest enclosing directory holding a `.git` entry.
 
 ## Targets
 
-Skills land in `<project>/<skillDir>/<skill>` for each selected target. Only detected targets start ticked in the wizard. Targets sharing a skill directory install each skill once.
+`install` places skills in the directory of each agent it detects, from project markers, home markers and executables on `PATH`. With none detected, it uses `.agents/skills` and `.claude/skills`. An agent recorded for a project stays when it is reinstalled; `nyx remove` starts over.
 
 | Skill directory | Targets |
 | --- | --- |
@@ -69,11 +67,17 @@ Skills land in `<project>/<skillDir>/<skill>` for each selected target. Only det
 
 Detection honors `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, and `XDG_CONFIG_HOME` for the tools that use them.
 
+## Upgrading from nyx 0.2
+
+Projects set up by 0.2 keep working: `nyx` shows them, `nyx update` updates them, `nyx install` changes their skills and keeps their agents, and `nyx remove` clears them.
+
+The wizard, `nyx setup` and user-level installs (`-g`) stay on the [`v0.2` branch](https://github.com/planetis-m/nyx/tree/v0.2). User-level skills set up by 0.2 keep updating here; to change or remove them, use a 0.2 binary (`NYX_VERSION=v0.2.4` with the install script).
+
 ## Files
 
 State lives in the platform data directory (`~/.local/share/nyx` on Linux) or wherever `NYX_HOME` points:
 
-- `state.json` - what nyx manages, per project. Written by temporary file plus rename; unreadable state is set aside as `state.json.bad`.
+- `state.json` - what nyx installed, per project. Written by temporary file plus rename; unreadable state is set aside as `state.json.bad`.
 - `skills/` - the git clone of the skills repository.
 
 ## Environment
@@ -90,9 +94,7 @@ State lives in the platform data directory (`~/.local/share/nyx` on Linux) or wh
 - The skills clone is only ever fast-forwarded, never reset or merged.
 - Git never prompts for credentials; missing access or a network failure leaves installed skills in place.
 
-Updates are checked lazily at most once every 15 days whenever `nyx` is run.
-
-A skill renamed upstream is not migrated automatically: `nyx update` keeps the old install (a link may dangle). Run `nyx setup` in each affected project to install the new name and remove the old one.
+Updates are checked at most once every 15 days when `nyx` is run. A skill renamed or removed upstream is flagged; run `nyx install` with the current names to replace it.
 
 ## Tests
 

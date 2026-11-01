@@ -1,19 +1,12 @@
-## Terminal look and interaction: colors, logo, prompts, and results.
+## Terminal look: colors, logo, and results.
 
-import std/[syncio, strutils, parseutils, terminal, colors, os]
+import std/[syncio, strutils, terminal, colors, os]
 
 const
   Logo = slurp("../assets/logo.ans")
   Reset* = ansiResetCode
   # Fire gradient of the NYX wordmark, top row to bottom row.
   MarkColors = [(255, 226, 52), (255, 161, 23), (245, 103, 10), (226, 52, 14)]
-
-type
-  Choice* = object
-    label*: string
-    detail*: string
-    tag*: string       ## short colored marker, e.g. "pro"
-    group*: string     ## section header; printed when it changes
 
 let
   Bold* = ansiStyleCode(styleBright)
@@ -88,9 +81,6 @@ proc banner*() =
 
 # --- output helpers -------------------------------------------------------
 
-proc heading*(s: string) =
-  line "  " & Bold & Gold & s.toUpperAscii
-
 proc field*(label, value: string) =
   line "  " & Ash & alignLeft(label, 9) & Reset & value
 
@@ -105,71 +95,5 @@ proc fail*(s: string) =
 
 proc dim*(s: string): string = Ash & s & Reset
 
-# --- input ----------------------------------------------------------------
-
-proc ask*(prompt: string): string =
-  ## Read one line; EOF (ctrl-d) aborts the whole run quietly.
-  put "  " & Gold & "> " & Reset & Ash & prompt & Reset & " "
-  var s = ""
-  if not readLine(stdin, s):
-    line()
-    line "  " & dim("aborted")
-    quit(1)
-  result = s.strip()
-
-proc confirm*(prompt: string; default: bool): bool =
-  let hint = if default: "[Y/n]" else: "[y/N]"
-  let a = ask(prompt & " " & hint).toLowerAscii
-  if a.len == 0: result = default
-  else: result = a[0] == 'y'
-
-proc drawChoices(items: seq[Choice]; sel: seq[bool]): int =
-  ## Prints the list, returns how many lines it used.
-  result = 0
-  var width = 0
-  for it in items: width = max(width, it.label.len)
-  var group = ""
-  for i in 0 ..< items.len:
-    let it = items[i]
-    if it.group != group:
-      group = it.group
-      line "  " & Ash & "-- " & group
-      inc result
-    let box = if sel[i]: Gold & "[x]" else: Ash & "[ ]"
-    let name = (if sel[i]: White else: Bone) & alignLeft(it.label, width + 2)
-    let tag = if it.tag.len > 0: Gold & alignLeft(it.tag, 4) else: ""
-    line "  " & Ash & align($(i + 1), 2) & " " & box & " " & name & tag & Ash & it.detail
-    inc result
-
-proc choose*(items: seq[Choice]; sel: var seq[bool]; minOne: bool) =
-  ## Numbered checkbox list. Type numbers to toggle (e.g. `1 3`), `a` for all,
-  ## `n` for none, enter to accept. Redraws in place.
-  var drawn = drawChoices(items, sel)
-  while true:
-    let a = ask("toggle 1-" & $items.len & ", a/n, enter to accept")
-    let lines = drawn + 1
-    if a.len == 0:
-      if true in sel or not minOne:
-        if interactive(): put "\x1b[1F\x1b[J"   # drop the spent prompt line
-        break
-      put "\x1b[" & $lines & "F\x1b[J"
-      drawn = drawChoices(items, sel)
-      warn "pick at least one"
-      inc drawn
-    else:
-      case a
-      of "a":
-        for i in 0 ..< sel.len: sel[i] = true
-      of "n":
-        for i in 0 ..< sel.len: sel[i] = false
-      else:
-        for tok in a.split(Whitespace + {','}):
-          var n = BiggestInt(0)
-          if parseBiggestInt(tok, n) == tok.len and n >= 1 and n <= items.len:
-            sel[int(n) - 1] = not sel[int(n) - 1]
-      if interactive():
-        put "\x1b[" & $lines & "F\x1b[J"
-      drawn = drawChoices(items, sel)
-
 proc done*(label, detail: string) =
-  line "  " & Gold & "+ " & Reset & alignLeft(label, 25) & dim(detail)
+  line "  " & Gold & "+ " & Reset & alignLeft(label, 25) & "  " & dim(detail)

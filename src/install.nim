@@ -151,11 +151,10 @@ proc resync*(inst: var Install) {.raises.} =
 proc sync*(p: var Project; store: Path; dirs: seq[Path]; skills: seq[string];
            copy = false): Report =
   ## Make the project hold exactly `skills` in each of `dirs` (relative to
-  ## `p.root`, or absolute for a global project), linking from `store`.
-  ## `copy` forces copies.
+  ## `p.root`), linking from `store`. `copy` forces copies.
   result = Report()
   var bases: seq[Path] = @[]
-  for d in dirs: bases.add(if p.global: d else: p.root / d)
+  for d in dirs: bases.add p.root / d
   var want: seq[Path] = @[]
   for b in bases:
     for s in skills: want.add b / path(s)

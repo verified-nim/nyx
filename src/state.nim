@@ -25,6 +25,9 @@ type
     files*: seq[Path]  ## Copy only: files NYX wrote, relative to `path`
 
   Project* = object
+    ## `global` comes from nyx 0.2, whose state this version reads and whose
+    ## binary can still read this state: a global entry keeps getting refreshed,
+    ## but only 0.2 can change it.
     root*: Path  ## canonical absolute project root; the key; empty when `global`
     global*: bool  ## the user's own skill directories, not a project
     targets*: seq[string]   ## target ids
@@ -62,12 +65,6 @@ proc find*(s: State; root: Path): int =
   result = -1
   for i in 0 ..< s.projects.len:
     if not s.projects[i].global and s.projects[i].root == root: return i
-
-proc findGlobal*(s: State): int =
-  ## The user-scope entry, or -1.
-  result = -1
-  for i in 0 ..< s.projects.len:
-    if s.projects[i].global: return i
 
 # --- project root ---------------------------------------------------------
 
