@@ -66,22 +66,23 @@ main { display: grid; align-content: start; gap: 10px; overflow-y: auto; }
 .tiles { display: grid; grid-template-columns: repeat(9, 88px); grid-auto-rows: 96px; gap: 8px; }
 .tile {
   position: relative;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  padding: 6px 7px 7px;
+  display: grid;
+  grid-template-rows: 12px 28px 1fr;
+  gap: 3px;
   text-align: left;
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 6px;
   cursor: pointer;
 }
-.sym { font-size: 1.5rem; line-height: 1.1; font-weight: 700; }
-.nm { font-size: 0.6875rem; line-height: 1.2; color: var(--muted); overflow-wrap: anywhere; hyphens: auto; }
+.no { font-size: 0.625rem; line-height: 12px; font-weight: 600; color: var(--muted); }
+.sym { font-size: 1.75rem; line-height: 1; font-weight: 800; letter-spacing: -0.02em; }
+.nm { padding-top: 5px; font-size: 0.625rem; line-height: 1.15; font-weight: 600; color: var(--muted); overflow-wrap: anywhere; hyphens: auto; }
 .tile:hover { background: color-mix(in srgb, var(--c) 28%, var(--paper)); }
 .tile:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
 .tile.on { background: var(--c); border-color: transparent; color: #16171d; }
-.tile.on .nm { color: inherit; }
+.tile.on .no, .tile.on .nm { color: inherit; }
 
 /* Small screens show the description as a bar at the top; desktop, beside the tile. */
 .tip {

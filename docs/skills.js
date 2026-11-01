@@ -38,7 +38,7 @@
         t.type = "button";
         t.dataset.name = s.name;
         t.setAttribute("aria-label", s.name + ". " + s.blurb);
-        t.append(el("span", "sym", symbol(s.name, used)), el("span", "nm", short(s.name)), el("span", "tip", s.blurb));
+        t.append(el("span", "no", String(Object.keys(sizes).length)), el("span", "sym", symbol(s.name, used)), el("span", "nm", short(s.name)), el("span", "tip", s.blurb));
         tiles.append(t);
       }
       row.append(head, tiles);
