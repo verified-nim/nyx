@@ -6,6 +6,8 @@ Skills are cloned once into nyx's data directory. Each project gets symlinks (or
 
 ![nyx wizard: pick the agent targets and skills to install](assets/wizard.svg)
 
+This is the maintained 0.2 branch: the setup wizard, every agent target and user-level installs. The current nyx is on [`master`](https://github.com/planetis-m/nyx). To install 0.2, set `NYX_VERSION` to a 0.2 tag such as `v0.2.4` when running the scripts below; without it they install the current release.
+
 ## Install
 
 Linux and macOS (installs to `~/.local/bin`):
