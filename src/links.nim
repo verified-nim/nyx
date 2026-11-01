@@ -133,7 +133,7 @@ proc unplace*(inst: Install): bool =
     removeEmptyDirs(inst.path)
   result = not taken(inst.path)
 
-proc takeOut(inst: Install; rep: var Report) =
+proc undo(inst: Install; rep: var Report) =
   if unplace(inst): rep.removed.add inst.path
   else: rep.kept.add inst.path
 
@@ -169,7 +169,7 @@ proc sync*(p: var Project; store: Path; dirs: seq[Path]; skills: seq[string];
       # Missing or replaced installs are no longer ours.
       if intact(inst): keep.add inst
     else:
-      takeOut(inst, result)
+      undo(inst, result)
   p.installs = keep
 
   for b in bases:
@@ -193,13 +193,13 @@ proc sync*(p: var Project; store: Path; dirs: seq[Path]; skills: seq[string];
             result.failed.add dest
   pruneDirs(p)
 
-proc removeSkills*(p: var Project; skills: seq[string]): Report =
+proc drop*(p: var Project; skills: seq[string]): Report =
   ## Undo the installs of just these skills.
   result = Report()
   var keep: seq[Install] = @[]
   for inst in p.installs:
     if inst.skill notin skills: keep.add inst
-    else: takeOut(inst, result)
+    else: undo(inst, result)
   p.installs = keep
   pruneDirs(p)
 

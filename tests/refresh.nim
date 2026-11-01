@@ -123,7 +123,7 @@ proc testRefresh*(tmp: Path): int {.raises.} =
     advance(root, blocked = true)
     discard refresh(c)
     reload(c)
-    discard removeSkills(c.st.projects[0], @["alpha"])
+    discard drop(c.st.projects[0], @["alpha"])
     check(not fileExists($(dest / path("new.txt"))), "remove cleans new file from failed refresh")
     check(not fileExists($(dest / path("obsolete.txt"))),
       "remove retains ownership of obsolete file")
@@ -201,7 +201,7 @@ proc testShortCopy*(tmp: Path): int {.raises.} =
     readFile($(dest / path("large.txt"))).len < 4096,
     "initial copy failed after destination creation")
   check(path("large.txt") in p.installs[0].files, "initial partial file ownership is recorded")
-  discard removeSkills(p, @["alpha"])
+  discard drop(p, @["alpha"])
   check(not fileExists($(dest / path("large.txt"))), "initial partial file is removed")
 
   var inst = Install(path: tmp / path("refresh"), source: store / path("alpha"), mode: Copy,

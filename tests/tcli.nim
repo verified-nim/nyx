@@ -3,7 +3,7 @@
 
 import std/[paths, symlinks, syncio, strutils, os, dirs, files, osproc, streams,
             envvars, strtabs, tempfiles]
-import ../src/[state, install]
+import ../src/[state, links]
 
 var failures = 0   # single-threaded test program
 

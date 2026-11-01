@@ -2,7 +2,7 @@
 ## current project, and keeps them up to date.
 
 import std/[appdirs, paths, syncio, strutils, os, dirs, smartcli]
-import state, targets, catalog, repo, install, ui
+import state, targets, catalog, repo, links, ui
 
 const
   PageUrl = "https://verified-nim.github.io/nyx/"
@@ -69,7 +69,7 @@ proc notes(c: Ctx) =
   if c.corrupt:
     warn "state was unreadable, starting fresh" & dim("  (kept as state.json.bad)")
 
-proc pointToPage() =
+proc page() =
   line "  " & dim("pick your skills at ") & PageUrl
   line "  " & dim("then run the command it gives you in your project")
 
@@ -115,7 +115,7 @@ proc refresh(c: var Ctx; changed: var seq[string]): bool =
     return false
 
   let newRev = head(store)
-  let diff = changedSkills(store, oldRev, newRev)
+  let diff = touched(store, oldRev, newRev)
   # An absent revision or unavailable diff cannot establish what was applied.
   # Recopy conservatively; an unchanged, known revision needs no work.
   let all = oldRev.len == 0 or newRev.len == 0 or
@@ -143,7 +143,7 @@ proc report(p: Project; changed: seq[string]) =
       inc updated
   done("skills", $updated & " updated, " & $(p.skills.len - updated) & " current")
 
-proc showSkills(p: Project) =
+proc list(p: Project) =
   for name in p.skills: ok name
   let gone = missing(p)
   if gone > 0:
@@ -151,7 +151,7 @@ proc showSkills(p: Project) =
 
 # --- commands ----------------------------------------------------------------
 
-proc showChanges(c: Ctx; rep: Report) =
+proc changes(c: Ctx; rep: Report) =
   for d in rep.removed:
     line "  " & Alert & "- " & Reset & c.rel(d) & "  " & dim("removed")
   for d in rep.collisions: warn c.rel(d) & dim("  exists, not nyx's; left alone")
@@ -163,7 +163,7 @@ proc status(c: var Ctx) =
   notes(c)
   let idx = c.st.find(c.root)
   if idx < 0:
-    pointToPage()
+    page()
     line()
     return
   field "project", display(c.root)
@@ -172,10 +172,10 @@ proc status(c: var Ctx) =
     if refresh(c, changed): report(c.st.projects[idx], changed)
   field "checked", ago(c.st.lastCheck)
   line()
-  showSkills(c.st.projects[idx])
+  list(c.st.projects[idx])
   line()
 
-proc chooseTargets(c: Ctx; recorded: seq[string]): seq[string] =
+proc pick(c: Ctx; recorded: seq[string]): seq[string] =
   ## Targets already recorded stay, detected ones join. With nothing to go on,
   ## the two directories most agents read.
   result = recorded
@@ -184,12 +184,12 @@ proc chooseTargets(c: Ctx; recorded: seq[string]): seq[string] =
     if t.id notin result and detect(t, c.root, home): result.add t.id
   if result.len == 0: result = @["agents", "claude"]
 
-proc installSkills(c: var Ctx; wanted: seq[string]) =
+proc install(c: var Ctx; wanted: seq[string]) =
   ## Add `wanted` to this project's skills and restore any that went missing.
   banner()
   notes(c)
   if wanted.len == 0:
-    pointToPage()
+    page()
     line()
     quit(1)
 
@@ -216,11 +216,11 @@ proc installSkills(c: var Ctx; wanted: seq[string]) =
       chosen.add name
   if unknown:
     line "  " & dim("nothing changed")
-    pointToPage()
+    page()
     line()
     quit(1)
 
-  p.targets = chooseTargets(c, p.targets)
+  p.targets = pick(c, p.targets)
   let dirs = skillDirs(p.targets)
   let rep = sync(p, store, dirs, chosen)
 
@@ -231,7 +231,7 @@ proc installSkills(c: var Ctx; wanted: seq[string]) =
         p.skills.add name
         done(name, if inst.mode == Link: "linked" else: "copied")
         break
-  showChanges(c, rep)
+  changes(c, rep)
   for d in rep.failed: fail c.rel(d) & dim("  could not install")
 
   if p.installs.len > 0 or p.dirs.len > 0:
@@ -255,10 +255,10 @@ proc update(c: var Ctx) =
   let refreshed = refresh(c, changed)
   let idx = c.st.find(c.root)
   if idx < 0:
-    pointToPage()
+    page()
   else:
     if refreshed: report(c.st.projects[idx], changed)
-    showSkills(c.st.projects[idx])
+    list(c.st.projects[idx])
   line()
 
 proc remove(c: var Ctx; names: seq[string]) =
@@ -281,7 +281,7 @@ proc remove(c: var Ctx; names: seq[string]) =
     line()
     quit(1)
   field "project", display(c.root)
-  let rep = removeSkills(p, names)
+  let rep = drop(p, names)
   var left: seq[string] = @[]
   for name in p.skills:
     if name notin names: left.add name
@@ -289,9 +289,9 @@ proc remove(c: var Ctx; names: seq[string]) =
   if p.installs.len > 0: c.st.projects[idx] = p
   else: c.st.projects.delete(idx)
   save(c)
-  showChanges(c, rep)
+  changes(c, rep)
   line()
-  showSkills(p)
+  list(p)
   line()
 
 proc clear(c: var Ctx) =
@@ -305,10 +305,10 @@ proc clear(c: var Ctx) =
   field "project", display(c.root)
   var p = c.st.projects[idx]
   let names = p.skills
-  let rep = removeSkills(p, names)
+  let rep = drop(p, names)
   c.st.projects.delete(idx)
   save(c)
-  showChanges(c, rep)
+  changes(c, rep)
   line()
 
 proc main =
@@ -333,7 +333,7 @@ Options:
 """
   var c = context()
   case opts.command
-  of cmdInstall: installSkills(c, opts.skill)
+  of cmdInstall: install(c, opts.skill)
   of cmdUpdate: update(c)
   of cmdRemove: remove(c, opts.skill)
   of cmdClear: clear(c)

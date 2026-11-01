@@ -82,7 +82,7 @@ proc head*(dir: Path): string =
   var o = ""
   result = if git(["-C", $dir, "rev-parse", "HEAD"], o) == Done: o.strip() else: ""
 
-proc changedSkills*(dir: Path; fromRev, toRev: string): seq[string] =
+proc touched*(dir: Path; fromRev, toRev: string): seq[string] =
   ## Top-level directories touched between two commits.
   result = @[]
   if fromRev.len == 0 or toRev.len == 0 or fromRev == toRev: return

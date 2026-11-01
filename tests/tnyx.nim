@@ -7,7 +7,7 @@
 ## root case.
 
 import std/[paths, symlinks, syncio, strutils, os, dirs, files, osproc, streams, envvars, tempfiles, opt]
-import ../src/[state, catalog, repo, install, targets]
+import ../src/[state, catalog, repo, links, targets]
 import paths
 
 var failures = 0   # single-threaded test program
@@ -371,12 +371,12 @@ proc testInstall(tmp: Path) {.raises.} =
     check(not taken(copyDir / path(name)), "refresh still skips source " & name)
 
   # Remove everything NYX made in both projects.
-  r = removeSkills(p, @["alpha"])
+  r = drop(p, @["alpha"])
   check(r.kept.len == 0 and p.installs.len == 0, "links removed")
   check(not dirExists($(root / path(".pi"))), "empty created dirs pruned")
   check(readFile($(root / path(".claude/skills/alpha/SKILL.md"))) == "user's own alpha",
         "remove leaves unmanaged files")
-  r = removeSkills(q, @["alpha"])
+  r = drop(q, @["alpha"])
   check(r.kept == @[copyDir], "modified copy reported as kept")
   check(fileExists($(copyDir / path("mine.txt"))) and not fileExists($(copyDir / path("SKILL.md"))),
         "only NYX's files removed from a copy")
@@ -389,7 +389,7 @@ proc testInstall(tmp: Path) {.raises.} =
   discard tryRemoveFile(g)
   mkfile(g / path("SKILL.md"), "replaced")
   check(missing(u) == 1, "replaced install counts as missing")
-  r = removeSkills(u, @["gamma"])
+  r = drop(u, @["gamma"])
   check(r.kept == @[g] and readFile($(g / path("SKILL.md"))) == "replaced",
     "replacement left alone")
 
@@ -444,8 +444,8 @@ proc testRepo(tmp: Path) {.raises.} =
   writeFile($(origin / path("beta") / path("SKILL.md")), skillMd("Beta v2."))
   check(sh(origin, ["commit", "-q", "-am", "two"]) == 0, "second commit")
   check(pull(clone, o) == Done, "pull: " & o)
-  check(changedSkills(clone, before, head(clone)) == @["beta"], "changed skills")
-  check(changedSkills(clone, head(clone), head(clone)).len == 0, "no change")
+  check(touched(clone, before, head(clone)) == @["beta"], "changed skills")
+  check(touched(clone, head(clone), head(clone)).len == 0, "no change")
 
 proc testChangedSkills(tmp: Path) {.raises.} =
   let dir = tmp / path("changes")
@@ -462,12 +462,12 @@ proc testChangedSkills(tmp: Path) {.raises.} =
         sh(dir, ["commit", "-q", "-m", "initial"]) == 0, "initial change commit")
   var before = head(dir)
   check(before.len > 0, "change fixture has a revision")
-  check(changedSkills(dir, "", before).len == 0, "empty starting revision")
-  check(changedSkills(dir, before, "").len == 0, "empty ending revision")
-  check(changedSkills(dir, before, before).len == 0, "equal revisions")
+  check(touched(dir, "", before).len == 0, "empty starting revision")
+  check(touched(dir, before, "").len == 0, "empty ending revision")
+  check(touched(dir, before, before).len == 0, "equal revisions")
   check(sh(dir, ["commit", "-q", "--allow-empty", "-m", "same tree"]) == 0,
         "empty commit")
-  check(head(dir) != before and changedSkills(dir, before, head(dir)).len == 0,
+  check(head(dir) != before and touched(dir, before, head(dir)).len == 0,
         "distinct commits with identical trees have no changes")
 
   before = head(dir)
@@ -479,7 +479,7 @@ proc testChangedSkills(tmp: Path) {.raises.} =
   check(sh(dir, ["add", "-A"]) == 0 and
         sh(dir, ["commit", "-q", "-m", "ordinary changes"]) == 0,
         "ordinary change commit")
-  let ordinary = changedSkills(dir, before, head(dir))
+  let ordinary = touched(dir, before, head(dir))
   check(ordinary == @["alpha", "beta"],
         "ordinary additions, edits and deletions deduplicate skills: " & ordinary.join(","))
 
@@ -494,20 +494,20 @@ proc testChangedSkills(tmp: Path) {.raises.} =
     expected = @["beta", "delta", "gamma"]
   check(sh(dir, ["add", "-A"]) == 0 and
         sh(dir, ["commit", "-q", "-m", "quoted paths"]) == 0, "quoted path commit")
-  let quoted = changedSkills(dir, before, head(dir))
+  let quoted = touched(dir, before, head(dir))
   check(quoted == expected, "literal skills from quoted filenames: " & quoted.join(","))
 
   before = head(dir)
   check(sh(dir, ["mv", "alpha/guide.txt", "beta/guide.txt"]) == 0 and
         sh(dir, ["commit", "-q", "-m", "cross-skill move"]) == 0, "move commit")
-  let moved = changedSkills(dir, before, head(dir))
+  let moved = touched(dir, before, head(dir))
   check(moved == @["alpha", "beta"], "move touches both skills: " & moved.join(","))
 
   before = head(dir)
   mkfile(dir / path("README.md"), "root-only change")
   check(sh(dir, ["commit", "-q", "-am", "root only"]) == 0, "root-only commit")
-  check(changedSkills(dir, before, head(dir)).len == 0, "root files are not skills")
-  check(changedSkills(dir, "not-a-revision", head(dir)).len == 0,
+  check(touched(dir, before, head(dir)).len == 0, "root files are not skills")
+  check(touched(dir, "not-a-revision", head(dir)).len == 0,
         "failed diff keeps the empty-result policy")
 
 proc testGit(tmp: Path) {.raises.} =
