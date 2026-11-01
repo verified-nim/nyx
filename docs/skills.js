@@ -9,7 +9,6 @@
   const $ = id => document.getElementById(id);
   const fmt = n => n.toLocaleString("en-US");
   const short = n => n.replace(/^nimony-/, "").replace(/^nim-/, "").replace(/-build-debugging$/, "-build");
-  const noteHTML = $("note").innerHTML;
   let copyTimer = 0;
 
   function cap(s) { return s[0].toUpperCase() + s.slice(1).toLowerCase(); }
@@ -28,12 +27,6 @@
     return e;
   }
 
-  // The note under the command describes the active skill, or else gives the usage line.
-  function showNote(tile) {
-    if (tile) $("note").textContent = tile.dataset.blurb;
-    else $("note").innerHTML = noteHTML;
-  }
-
   function build(data) {
     const rows = $("rows");
     for (const { group, skills } of data) {
@@ -44,9 +37,8 @@
         const t = el("button", "tile");
         t.type = "button";
         t.dataset.name = s.name;
-        t.dataset.blurb = s.blurb;
         t.setAttribute("aria-label", s.name + ". " + s.blurb);
-        t.append(el("span", "sym", symbol(s.name, used)), el("span", "nm", short(s.name)));
+        t.append(el("span", "sym", symbol(s.name, used)), el("span", "nm", short(s.name)), el("span", "tip", s.blurb));
         tiles.append(t);
       }
       row.append(head, tiles);
@@ -59,15 +51,6 @@
       const name = t.dataset.name;
       if (sel.has(name)) sel.delete(name); else sel.add(name);
       render();
-    });
-    rows.addEventListener("focusin", e => showNote(e.target.closest(".tile")));
-    rows.addEventListener("focusout", () => showNote(null));
-    // The gaps between tiles keep the current description, so it doesn't flicker.
-    // Touch screens keep it too: a tap can report the pointer leaving straight away.
-    const canHover = matchMedia("(hover: hover)").matches;
-    document.addEventListener("mouseover", e => {
-      const t = e.target.closest(".tile");
-      if (t || (canHover && !e.target.closest(".tiles"))) showNote(t);
     });
   }
 
@@ -100,7 +83,6 @@
 
   $("copy").addEventListener("click", async () => {
     const copy = $("copy");
-    showNote(null);
     try {
       await navigator.clipboard.writeText(command());
       copy.textContent = "Copied";
