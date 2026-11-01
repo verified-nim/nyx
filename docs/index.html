@@ -2,42 +2,38 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Skill Table · NYX</title>
-<meta name="description" content="Press the Nim and Nimony skills your agent needs and copy one install command.">
+<meta name="description" content="Select the Nim and Nimony skills your agent needs and copy one install command.">
 <meta name="color-scheme" content="light dark">
 <link rel="canonical" href="https://verified-nim.github.io/nyx/">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="skills.css">
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>Skill Table</h1>
-    <p class="sub">Press the skills your agent needs.</p>
-  </header>
-  <main id="rows"></main>
-  <noscript><p>The table needs JavaScript. Without it, list the skill names yourself: <code>nyx install nim-testing nim-style-guide</code>.</p></noscript>
-</div>
-
-<div class="dock">
-  <div class="dockin">
-    <div class="stat">
-      <div class="rank" id="rank"></div>
-      <div class="sub2"><span id="count"></span><span id="chars"></span></div>
-      <div class="meter" id="meter"><i></i></div>
+<header class="page">
+  <h1>Skill Table</h1>
+  <p class="sub">Nim and Nimony skills for Claude Code, Codex, Cursor and more.</p>
+</header>
+<main class="page" id="rows">
+  <noscript><p>This page needs JavaScript. You can also name skills directly: <code>nyx install nim-testing nim-style-guide</code></p></noscript>
+</main>
+<footer class="dock">
+  <div class="page dockin">
+    <div class="stat" id="stat">
+      <div class="statline"><b id="rank"></b><span id="count"></span></div>
+      <div class="meter"><i id="meter"></i></div>
+      <div class="statline" id="chars"></div>
     </div>
-    <div class="right">
+    <div class="action">
       <div class="cmdrow">
         <div class="cmd empty" id="cmd"></div>
-        <button class="copy" id="copy" type="button" aria-label="Copy install command" title="Copy install command">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-        </button>
+        <button class="copy" id="copy" type="button" aria-live="polite">Copy</button>
       </div>
-      <div class="note" id="note" role="status"></div>
+      <div class="note" id="note">Run in your project root. Needs <a href="https://github.com/verified-nim/nyx">nyx</a> and a <a href="https://verified-nim.github.io/get-access.html">subscription</a>.</div>
     </div>
   </div>
-</div>
+</footer>
 <script src="skills.js"></script>
 </body>
 </html>

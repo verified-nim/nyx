@@ -1,21 +1,25 @@
-// Skill Table: press skills, read the listing size, copy one install command.
+// Skill Table: select skills, read the listing size, copy one install command.
 (function () {
   "use strict";
   const CAP = 8000;
   const SIZES = [[0, "Nothing selected"], [1, "Light set"], [3, "Focused set"], [6, "Broad set"], [10, "Large set"]];
   const sel = new Set();
-  const info = {};
+  const sizes = {};
   const groupEls = [];
   const $ = id => document.getElementById(id);
   const fmt = n => n.toLocaleString("en-US");
   const short = n => n.replace(/^nimony-/, "").replace(/^nim-/, "").replace(/-build-debugging$/, "-build");
-  let no = 0;
-  let noteTimer = 0;
+  const noteHTML = $("note").innerHTML;
+  let copyTimer = 0;
 
-  function symbol(n) {
+  function cap(s) { return s[0].toUpperCase() + s.slice(1).toLowerCase(); }
+  // Initials, or the first two letters when the row has already used those initials.
+  function symbol(n, used) {
     const w = short(n).split("-");
-    const s = w.length > 1 ? w[0][0] + w[1][0] : w[0].slice(0, 2);
-    return s[0].toUpperCase() + s.slice(1).toLowerCase();
+    const initials = w.length > 1 ? cap(w[0][0] + w[1][0]) : "";
+    const s = initials && !used.has(initials) ? initials : cap(w[0].slice(0, 2));
+    used.add(s);
+    return s;
   }
   function el(tag, cls, text) {
     const e = document.createElement(tag);
@@ -24,22 +28,27 @@
     return e;
   }
 
+  // The note under the command describes the active skill, or else gives the usage line.
+  function showNote(tile) {
+    if (tile) $("note").textContent = tile.dataset.blurb;
+    else $("note").innerHTML = noteHTML;
+  }
+
   function build(data) {
     const rows = $("rows");
     for (const { group, skills } of data) {
-      const row = el("section", "row"), head = el("div", "rhead"), tiles = el("div", "tiles");
-      head.append(el("div", "rname", group), el("div", "rprog"));
-      skills.forEach((s, i) => {
-        info[s.name] = s.chars + s.name.length;
-        const t = el("button", "tile" + (i >= 4 ? " r" : ""));
+      const row = el("section", "row"), head = el("div", "rhead"), tiles = el("div", "tiles"), used = new Set();
+      head.append(el("h2", "rname", group), el("div", "rprog"));
+      for (const s of skills) {
+        sizes[s.name] = s.chars + s.name.length;
+        const t = el("button", "tile");
         t.type = "button";
         t.dataset.name = s.name;
+        t.dataset.blurb = s.blurb;
         t.setAttribute("aria-label", s.name + ". " + s.blurb);
-        const tip = el("span", "tip");
-        tip.append(el("b", "", s.name), document.createTextNode(s.blurb));
-        t.append(el("span", "no", String(++no)), el("span", "sym", symbol(s.name)), el("span", "nm", short(s.name)), tip);
+        t.append(el("span", "sym", symbol(s.name, used)), el("span", "nm", short(s.name)));
         tiles.append(t);
-      });
+      }
       row.append(head, tiles);
       rows.append(row);
       groupEls.push([row, skills.map(s => s.name)]);
@@ -47,23 +56,22 @@
     rows.addEventListener("click", e => {
       const t = e.target.closest(".tile");
       if (!t) return;
-      const name = t.dataset.name, adding = !sel.has(name);
-      if (adding) sel.add(name); else sel.delete(name);
+      const name = t.dataset.name;
+      if (sel.has(name)) sel.delete(name); else sel.add(name);
       render();
-      if (adding) { t.classList.remove("pop"); void t.offsetWidth; t.classList.add("pop"); }
+    });
+    rows.addEventListener("focusin", e => showNote(e.target.closest(".tile")));
+    rows.addEventListener("focusout", () => showNote(null));
+    // The gaps between tiles keep the current description, so it doesn't flicker.
+    // Touch screens keep it too: a tap can report the pointer leaving straight away.
+    const canHover = matchMedia("(hover: hover)").matches;
+    document.addEventListener("mouseover", e => {
+      const t = e.target.closest(".tile");
+      if (t || (canHover && !e.target.closest(".tiles"))) showNote(t);
     });
   }
 
-  function command(full) {
-    const names = [...sel].sort();
-    if (full || names.length <= 2) return "nyx install " + names.join(" ");
-    return `nyx install ${names[0]} ${names[1]} +${names.length - 2} more`;
-  }
-  function resetNote() {
-    const n = $("note");
-    n.className = "note";
-    n.innerHTML = 'Needs <a href="https://github.com/verified-nim/nyx">nyx</a> and a <a href="https://verified-nim.github.io/get-access.html">subscription</a>. Installs for Claude Code, Codex, Cursor and more.';
-  }
+  function command() { return "nyx install " + [...sel].sort().join(" "); }
   function render() {
     document.querySelectorAll(".tile").forEach(t => {
       const on = sel.has(t.dataset.name);
@@ -71,48 +79,41 @@
       t.setAttribute("aria-pressed", on);
     });
     for (const [row, names] of groupEls) {
-      const k = names.filter(n => sel.has(n)).length, done = k === names.length;
-      row.classList.toggle("done", done);
-      row.querySelector(".rprog").textContent = done ? "Complete" : `${k} of ${names.length}`;
+      const k = names.filter(n => sel.has(n)).length;
+      row.classList.toggle("done", k === names.length);
+      row.querySelector(".rprog").textContent = `${k}/${names.length}`;
     }
     const count = sel.size;
-    const chars = [...sel].reduce((s, n) => s + info[n], 0);
+    const chars = [...sel].reduce((s, n) => s + sizes[n], 0);
     const full = chars > CAP;
     $("rank").textContent = full ? "Context full" : [...SIZES].reverse().find(r => count >= r[0])[1];
-    $("rank").classList.toggle("full", full);
-    $("count").textContent = `${count} of ${no} selected`;
+    $("count").textContent = `${count} of ${Object.keys(sizes).length}`;
     $("chars").textContent = `${fmt(chars)} / ${fmt(CAP)} context`;
-    $("meter").classList.toggle("full", full);
-    $("meter").firstElementChild.style.width = Math.min(100, chars / CAP * 100) + "%";
+    $("stat").classList.toggle("full", full);
+    $("meter").style.width = Math.min(100, chars / CAP * 100) + "%";
     const cmd = $("cmd");
-    if (!count) {
-      cmd.className = "cmd empty";
-      cmd.removeAttribute("title");
-      cmd.textContent = "Press a skill to build your command";
-      $("copy").disabled = true;
-    } else {
-      cmd.className = "cmd";
-      cmd.title = command(true);
-      cmd.replaceChildren(el("span", "", command(false)));
-      $("copy").disabled = false;
-    }
-    if (!noteTimer) resetNote();
+    cmd.classList.toggle("empty", !count);
+    cmd.textContent = count ? command() : "Select skills to build your install command";
+    cmd.title = count ? command() : "";
+    $("copy").disabled = !count;
   }
 
   $("copy").addEventListener("click", async () => {
-    const note = $("note");
-    let msg = "Copied. Run it in your project root.";
-    try { await navigator.clipboard.writeText(command(true)); }
-    catch (_) { msg = "Copy blocked here. Hover the box to read the full command."; }
-    note.className = "note ok";
-    note.textContent = msg;
-    clearTimeout(noteTimer);
-    noteTimer = setTimeout(() => { noteTimer = 0; resetNote(); }, 3500);
+    const copy = $("copy");
+    showNote(null);
+    try {
+      await navigator.clipboard.writeText(command());
+      copy.textContent = "Copied";
+    } catch (_) {
+      copy.textContent = "Blocked";
+    }
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => { copy.textContent = "Copy"; }, 1500);
   });
 
   render();
   fetch("skills.json")
     .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(data => { build(data); render(); })
-    .catch(() => { $("rows").append(el("p", "", "The skill list did not load. Reload the page to try again.")); });
+    .catch(() => { $("rows").append(el("p", "", "The skills didn't load. Reload the page to try again.")); });
 })();
