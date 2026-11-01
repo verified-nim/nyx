@@ -1,13 +1,13 @@
 #!/bin/sh
 # Installs the nyx binary from GitHub Releases on Linux and macOS.
 #
-#   curl -fsSL https://github.com/planetis-m/nyx/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/verified-nim/nyx/releases/latest/download/install.sh | sh
 #
 # NYX_VERSION      release tag to install (default: the latest release)
 # NYX_INSTALL_DIR  where to put nyx (default: ~/.local/bin)
 set -eu
 
-repo="planetis-m/nyx"
+repo="verified-nim/nyx"
 version="${NYX_VERSION:-latest}"
 dir="${NYX_INSTALL_DIR:-$HOME/.local/bin}"
 
