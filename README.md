@@ -38,7 +38,7 @@ Release binaries are built with the native backend (`nimony n -d:release -o:bin/
 
 ## Usage
 
-Pick your skills on the [skill table](https://verified-nim.github.io/skills.html); it gives you the install command. Run it in your project:
+Pick your skills on the [skill table](https://planetis-m.github.io/nyx/); it gives you the install command. Run it in your project:
 
 ```sh
 nyx install nim-testing nim-style-guide  # make this project's skills exactly these
@@ -95,6 +95,10 @@ State lives in the platform data directory (`~/.local/share/nyx` on Linux) or wh
 - Git never prompts for credentials; missing access or a network failure leaves installed skills in place.
 
 Updates are checked at most once every 15 days when `nyx` is run. A skill renamed or removed upstream is flagged; run `nyx install` with the current names to replace it.
+
+## Skill table page
+
+`docs/` holds the page, served by GitHub Pages. `docs/skills.json` is generated from the catalog when skills are published.
 
 ## Tests
 

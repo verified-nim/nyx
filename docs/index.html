@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pick your Nim skills and install them with one command · Verified Nim Skills</title>
+<meta name="description" content="Press the Nim and Nimony skills your project uses and copy one command. NYX installs them where your agents look.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#111113" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://planetis-m.github.io/nyx/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="site.css">
+<link rel="stylesheet" href="skills.css">
+<meta property="og:title" content="Pick your Nim skills and install them with one command · Verified Nim Skills">
+<meta property="og:description" content="Press the Nim and Nimony skills your project uses and copy one command. NYX installs them where your agents look.">
+<meta property="og:type" content="website">
+</head>
+<body class="skills-page">
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap site-header__inner">
+    <a class="brand" href="https://github.com/planetis-m/nyx">NYX</a>
+    <nav class="nav" aria-label="Primary">
+      <ul>
+      <li><a href="https://github.com/planetis-m/nyx#usage">Usage</a></li>
+      <li><a class="btn btn--primary" href="https://verified-nim.github.io/get-access.html">Get access</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="main">
+<section class="hero hero--compact">
+  <div class="wrap">
+    <h1 class="hero__title">Give your agent the skills this project needs</h1>
+    <p class="hero__lede">Press what the project uses and copy one command. NYX puts those skills where your agents look.</p>
+  </div>
+</section>
+
+<section class="section" aria-label="Skills">
+  <div class="wrap">
+    <div id="skill-rows"></div>
+    <noscript><p>The table needs JavaScript. Without it, list the skill names yourself: <code>nyx install nim-testing nim-style-guide</code>.</p></noscript>
+    <p class="small muted">Agents list every installed skill&rsquo;s description within about 8,000 characters, so a smaller set keeps each one whole.</p>
+  </div>
+</section>
+</main>
+
+<div class="dock">
+  <div class="wrap dock__inner">
+    <div>
+      <p class="dock__stats"><span id="count"></span><span id="chars"></span></p>
+      <div class="meter" id="meter" aria-hidden="true"><i></i></div>
+    </div>
+    <div>
+      <div class="command">
+        <code id="command" tabindex="0"></code>
+        <button class="btn btn--primary" id="copy" type="button">Copy</button>
+      </div>
+      <p class="dock__note" id="note-default"><a href="https://verified-nim.github.io/get-access.html#onboarding">Install NYX</a> first; the catalog comes with a <a href="https://verified-nim.github.io/pricing.html">subscription</a>.</p>
+      <p class="dock__note" id="note" role="status" hidden></p>
+    </div>
+  </div>
+</div>
+<footer class="site-footer">
+  <div class="wrap">
+    <p class="small muted">Skills from <a href="https://verified-nim.github.io/">Verified Nim Skills</a>. NYX is open source: <a href="https://github.com/planetis-m/nyx">planetis-m/nyx</a>.</p>
+  </div>
+</footer>
+<script src="skills.js"></script>
+</body>
+</html>

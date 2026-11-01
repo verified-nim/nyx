@@ -1,0 +1,182 @@
+[
+ {
+  "group": "Craft",
+  "skills": [
+   {
+    "name": "nim-style-guide",
+    "blurb": "Keeps new Nim code in one clear, stdlib-like style.",
+    "chars": 275
+   },
+   {
+    "name": "nim-syntax-pitfalls",
+    "blurb": "Fixes parse and type errors caused by whitespace, brackets and operator grouping.",
+    "chars": 292
+   },
+   {
+    "name": "nim-api-design",
+    "blurb": "Shapes a library's public side: types, constructors, ownership, errors.",
+    "chars": 298
+   },
+   {
+    "name": "nim-code-organization",
+    "blurb": "Decides where state lives and when a module should be split.",
+    "chars": 334
+   },
+   {
+    "name": "nim-error-handling",
+    "blurb": "Picks exceptions, Option or bool, and enforces raises contracts.",
+    "chars": 305
+   },
+   {
+    "name": "nim-ownership-hooks",
+    "blurb": "Writes destroy, copy and sink hooks for types that own resources.",
+    "chars": 284
+   },
+   {
+    "name": "nim-doc-comments",
+    "blurb": "Writes doc comments that nim doc attaches, with runnable examples.",
+    "chars": 276
+   },
+   {
+    "name": "nim-string-parsing",
+    "blurb": "Cuts and scans text without needless copies or allocations.",
+    "chars": 333
+   }
+  ]
+ },
+ {
+  "group": "Proof",
+  "skills": [
+   {
+    "name": "nim-testing",
+    "blurb": "Deterministic tests across debug, release and danger, with sanitizers.",
+    "chars": 329
+   },
+   {
+    "name": "nim-fuzzing",
+    "blurb": "libFuzzer harnesses for parsers and formats, with crash triage.",
+    "chars": 295
+   },
+   {
+    "name": "nim-debugging",
+    "blurb": "Finds the cause of compile failures, crashes and wrong results.",
+    "chars": 302
+   },
+   {
+    "name": "nim-defect-analysis",
+    "blurb": "Audits for crashes and overflows, then separates real bugs from noise.",
+    "chars": 335
+   },
+   {
+    "name": "nim-formal-verification",
+    "blurb": "Models threads and state machines and checks them with tlanif.",
+    "chars": 583
+   },
+   {
+    "name": "nim-bug-reporting",
+    "blurb": "Confirms a compiler bug and drafts a report with a minimal reproducer.",
+    "chars": 307
+   }
+  ]
+ },
+ {
+  "group": "Speed",
+  "skills": [
+   {
+    "name": "nim-performance",
+    "blurb": "Measures first, then removes hidden copies and allocations.",
+    "chars": 326
+   },
+   {
+    "name": "nim-autovectorization",
+    "blurb": "Shapes loops so the C compiler emits SIMD, proven from disassembly.",
+    "chars": 349
+   }
+  ]
+ },
+ {
+  "group": "Bridges",
+  "skills": [
+   {
+    "name": "nim-c-bindings",
+    "blurb": "Binds a C library and keeps it building on Linux, macOS and Windows.",
+    "chars": 374
+   },
+   {
+    "name": "nim-c-wrappers",
+    "blurb": "Turns raw C bindings into an idiomatic Nim API.",
+    "chars": 329
+   },
+   {
+    "name": "nim-porting",
+    "blurb": "Moves a module from another language while freezing behavior with tests.",
+    "chars": 323
+   },
+   {
+    "name": "nim-ci-release",
+    "blurb": "GitHub Actions CI and tagged releases for a Nim project.",
+    "chars": 175
+   },
+   {
+    "name": "atlas-dependencies",
+    "blurb": "Sets up and repairs Atlas-managed dependencies.",
+    "chars": 294
+   },
+   {
+    "name": "wine-windows-build-debugging",
+    "blurb": "Reproduces Windows failures from Linux under Wine.",
+    "chars": 302
+   }
+  ]
+ },
+ {
+  "group": "Nimony",
+  "skills": [
+   {
+    "name": "nimony-nim2-differences",
+    "blurb": "What changes when you bring Nim 2 habits to Nimony.",
+    "chars": 505
+   },
+   {
+    "name": "nimony-borrow-checker",
+    "blurb": "Fixes borrow errors without silently copying whole containers.",
+    "chars": 342
+   },
+   {
+    "name": "nimony-error-handling",
+    "blurb": "Sticky state, Result and raising routines in Nimony.",
+    "chars": 429
+   },
+   {
+    "name": "nimony-static-contracts",
+    "blurb": "Proves bounds so hot loops stay fast with checks on.",
+    "chars": 421
+   },
+   {
+    "name": "nimony-autovectorization",
+    "blurb": "SIMD from Nimony loops by proving every index.",
+    "chars": 333
+   },
+   {
+    "name": "nimony-sso-strings",
+    "blurb": "Small-string-optimized strings: raw access, bulk writes, C buffers.",
+    "chars": 442
+   },
+   {
+    "name": "nimony-assembler",
+    "blurb": "Structured assembly for the native backend.",
+    "chars": 398
+   },
+   {
+    "name": "nimony-plugins",
+    "blurb": "Compile-time plugins for code generation and DSL rewrites.",
+    "chars": 255
+   },
+   {
+    "name": "nimony-native-release",
+    "blurb": "Native release binaries and one-line install scripts.",
+    "chars": 353
+   }
+  ]
+ }
+]
