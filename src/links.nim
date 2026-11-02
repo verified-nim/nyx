@@ -15,6 +15,7 @@ import state
 
 type
   Report* = object
+    placed*: seq[Path]      ## destinations newly linked or copied
     removed*: seq[Path]     ## destinations removed
     collisions*: seq[Path]  ## existing, not NYX's: left alone
     kept*: seq[Path]        ## NYX's, but changed by the user: left alone
@@ -189,6 +190,7 @@ proc sync*(p: var Project; store: Path; dirs: seq[Path]; skills: seq[string];
         else:
           try:
             place(p, s, store / path(s), dest, copy)
+            result.placed.add dest
           except:
             result.failed.add dest
   pruneDirs(p)
@@ -203,8 +205,8 @@ proc drop*(p: var Project; skills: seq[string]): Report =
   p.installs = keep
   pruneDirs(p)
 
-proc missing*(p: Project): int =
-  ## Installs that are no longer what NYX put there.
-  result = 0
+proc intact*(p: Project; skill: string): bool =
+  ## Are all of `skill`'s installs still what NYX put there?
   for inst in p.installs:
-    if not intact(inst): inc result
+    if inst.skill == skill and not intact(inst): return false
+  result = true

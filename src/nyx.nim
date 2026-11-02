@@ -67,7 +67,7 @@ proc context(): Ctx =
 
 proc notes(c: Ctx) =
   if c.corrupt:
-    warn "state was unreadable, starting fresh" & dim("  (kept as state.json.bad)")
+    warn "state was unreadable, starting fresh" & dim("  kept as state.json.bad")
 
 proc page() =
   line "  " & dim("pick your skills at ") & PageUrl
@@ -90,10 +90,42 @@ proc explain(r: GitResult; output: string; setup: bool) =
     fail "git failed"
     for l in output.strip().splitLines(): line "    " & dim(l)
 
-proc refresh(c: var Ctx; changed: var seq[string]): bool =
+proc installed(st: State): seq[string] =
+  ## Every skill nyx placed, in any project: they share one clone, so an
+  ## update reaches them all.
+  result = @[]
+  for p in st.projects:
+    for name in p.skills:
+      if name notin result: result.add name
+
+proc report(c: Ctx; fresh: bool; diff: seq[string]) =
+  ## What a refresh did to the skills nyx installed, wherever they are.
+  let store = skillsDir(c.data)
+  if fresh:
+    field "skills", $discover(store).len & " available"
+    return
+  let all = installed(c.st)
+  if all.len == 0:
+    field "skills", "none installed"
+    return
+  var updated: seq[string] = @[]
+  var vanished: seq[string] = @[]
+  for name in all:
+    if name notin diff: discard
+    elif dirExists($(store / path(name))): updated.add name
+    else: vanished.add name
+  var counts: seq[string] = @[]
+  if updated.len > 0: counts.add $updated.len & " updated"
+  if vanished.len > 0: counts.add $vanished.len & " removed upstream"
+  counts.add $(all.len - updated.len - vanished.len) & " current"
+  field "skills", counts.join(", ")
+  for name in updated: done(name, "updated")
+  for name in vanished: gone(name, "removed upstream")
+
+proc refresh(c: var Ctx): bool =
   ## Clone or fast-forward the skills repository, then bring copied installs
   ## in every project up to date: the clone and its applied revision are
-  ## shared. Reports the skills that changed. Records the check time either way.
+  ## shared. Reports the outcome. Records the check time either way.
   let store = skillsDir(c.data)
   let fresh = not dirExists($store)
   let oldRev = c.st.repoRev
@@ -131,31 +163,43 @@ proc refresh(c: var Ctx; changed: var seq[string]): bool =
           warn "could not refresh " & display(inst.path)
   if complete and newRev.len > 0: c.st.repoRev = newRev
   save(c)
-  if not fresh: changed = diff
+  report(c, fresh, diff)
   result = true
 
-proc report(p: Project; changed: seq[string]) =
-  ## What a refresh meant for this project's skills.
-  var updated = 0
-  for name in p.skills:
-    if name in changed:
-      done(name, "updated")
-      inc updated
-  done("skills", $updated & " updated, " & $(p.skills.len - updated) & " current")
+# --- the project view ---------------------------------------------------------
 
-proc list(p: Project) =
-  for name in p.skills: ok name
-  let gone = missing(p)
-  if gone > 0:
-    warn $gone & " installs changed or missing" & dim("  nyx install SKILL restores them")
+proc header(c: Ctx; p: Project) =
+  field "project", display(c.root)
+  var dirs: seq[string] = @[]
+  for d in skillDirs(p.targets): dirs.add $d
+  field "dirs", dirs.join(", ")
+
+proc how(p: Project; name: string): string =
+  result = "linked"
+  for inst in p.installs:
+    if inst.skill == name and inst.mode == Copy: return "copied"
+
+proc list(c: Ctx; p: Project; added, restored: seq[string] = @[]) =
+  ## This project's skills, one line each: what just happened to it, or
+  ## what needs attention.
+  let store = skillsDir(c.data)
+  let known = dirExists($store)
+  for name in p.skills:
+    if name in added: done(name, how(p, name))
+    elif name in restored: done(name, "restored")
+    elif known and not dirExists($(store / path(name))):
+      warn(name, "removed upstream; nyx install drops it")
+    elif not intact(p, name):
+      warn(name, "changed or missing; nyx install " & name & " restores it")
+    else: item name
+
+proc problems(c: Ctx; rep: Report) =
+  ## Destinations an operation had to leave alone or could not create.
+  for d in rep.collisions: warn(c.rel(d), "exists, not nyx's; left alone")
+  for d in rep.kept: warn(c.rel(d), "modified; left alone")
+  for d in rep.failed: fail c.rel(d) & dim("  could not install")
 
 # --- commands ----------------------------------------------------------------
-
-proc changes(c: Ctx; rep: Report) =
-  for d in rep.removed:
-    line "  " & Alert & "- " & Reset & c.rel(d) & "  " & dim("removed")
-  for d in rep.collisions: warn c.rel(d) & dim("  exists, not nyx's; left alone")
-  for d in rep.kept: warn c.rel(d) & dim("  modified; left alone")
 
 proc status(c: var Ctx) =
   ## The bare command: update when due and show this project's skills.
@@ -166,13 +210,14 @@ proc status(c: var Ctx) =
     page()
     line()
     return
-  field "project", display(c.root)
-  if isStale(c.st, now()):
-    var changed: seq[string] = @[]
-    if refresh(c, changed): report(c.st.projects[idx], changed)
-  field "checked", ago(c.st.lastCheck)
+  let due = isStale(c.st, now())
+  if due:
+    discard refresh(c)
+    line()
+  header(c, c.st.projects[idx])
+  if not due: field "checked", ago(c.st.lastCheck)
   line()
-  list(c.st.projects[idx])
+  list(c, c.st.projects[idx])
   line()
 
 proc pick(c: Ctx; recorded: seq[string]): seq[string] =
@@ -195,18 +240,20 @@ proc install(c: var Ctx; wanted: seq[string]) =
 
   let store = skillsDir(c.data)
   let fresh = not dirExists($store)
-  var changed: seq[string] = @[]
-  if not refresh(c, changed) and fresh:
-    line()
-    quit(1)
+  let fetched = refresh(c)
+  line()
+  if not fetched and fresh: quit(1)
 
   let catalog = discover(store)
   let idx = c.st.find(c.root)
   var p = if idx >= 0: c.st.projects[idx] else: Project(root: c.root)
   # A skill gone upstream drops out; its link goes with it.
-  var chosen: seq[string] = @[]
+  var before: seq[string] = @[]
+  var vanished: seq[string] = @[]
   for name in p.skills:
-    if name in catalog: chosen.add name
+    if name in catalog: before.add name
+    else: vanished.add name
+  var chosen = before
   var unknown = false
   for name in wanted:
     if name notin catalog:
@@ -221,18 +268,21 @@ proc install(c: var Ctx; wanted: seq[string]) =
     quit(1)
 
   p.targets = pick(c, p.targets)
-  let dirs = skillDirs(p.targets)
-  let rep = sync(p, store, dirs, chosen)
-
+  let rep = sync(p, store, skillDirs(p.targets), chosen)
+  var added: seq[string] = @[]
+  var restored: seq[string] = @[]
   p.skills = @[]
   for name in chosen:
+    var present = false
+    var placed = false
     for inst in p.installs:
       if inst.skill == name:
-        p.skills.add name
-        done(name, if inst.mode == Link: "linked" else: "copied")
-        break
-  changes(c, rep)
-  for d in rep.failed: fail c.rel(d) & dim("  could not install")
+        present = true
+        if inst.path in rep.placed: placed = true
+    if present:
+      p.skills.add name
+      if name notin before: added.add name
+      elif placed: restored.add name
 
   if p.installs.len > 0 or p.dirs.len > 0:
     if idx >= 0: c.st.projects[idx] = p
@@ -240,25 +290,19 @@ proc install(c: var Ctx; wanted: seq[string]) =
   elif idx >= 0:
     c.st.projects.delete(idx)
   save(c)
-  var places: seq[string] = @[]
-  for d in dirs: places.add $d
+  header(c, p)
   line()
-  line "  " & Bold & "ready" & Reset &
-    dim("  " & $p.skills.len & " skills in " & places.join(", "))
+  for name in vanished: gone(name, "removed upstream")
+  list(c, p, added, restored)
+  problems(c, rep)
   line()
   if rep.failed.len > 0: quit(1)
 
 proc update(c: var Ctx) =
+  ## Update every skill nyx installed, wherever it was run from.
   banner()
   notes(c)
-  var changed: seq[string] = @[]
-  let refreshed = refresh(c, changed)
-  let idx = c.st.find(c.root)
-  if idx < 0:
-    page()
-  else:
-    if refreshed: report(c.st.projects[idx], changed)
-    list(c.st.projects[idx])
+  discard refresh(c)
   line()
 
 proc remove(c: var Ctx; names: seq[string]) =
@@ -280,7 +324,6 @@ proc remove(c: var Ctx; names: seq[string]) =
     line "  " & dim("nothing changed")
     line()
     quit(1)
-  field "project", display(c.root)
   let rep = drop(p, names)
   var left: seq[string] = @[]
   for name in p.skills:
@@ -289,9 +332,11 @@ proc remove(c: var Ctx; names: seq[string]) =
   if p.installs.len > 0: c.st.projects[idx] = p
   else: c.st.projects.delete(idx)
   save(c)
-  changes(c, rep)
+  header(c, p)
   line()
-  list(p)
+  for name in names: gone(name, "removed")
+  list(c, p)
+  problems(c, rep)
   line()
 
 proc clear(c: var Ctx) =
@@ -302,13 +347,15 @@ proc clear(c: var Ctx) =
     line "  " & dim("nothing to remove here")
     line()
     return
-  field "project", display(c.root)
   var p = c.st.projects[idx]
   let names = p.skills
   let rep = drop(p, names)
   c.st.projects.delete(idx)
   save(c)
-  changes(c, rep)
+  header(c, p)
+  line()
+  for name in names: gone(name, "removed")
+  problems(c, rep)
   line()
 
 proc main =

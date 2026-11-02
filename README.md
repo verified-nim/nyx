@@ -45,7 +45,7 @@ nyx install nim-testing nim-style-guide  # add these skills to this project
 nyx remove nim-testing                   # remove this skill
 nyx clear                                # remove all of this project's skills
 nyx                                      # show them, updating when a check is due
-nyx update                               # update now
+nyx update                               # update skills in every project now
 nyx -h                                   # help
 ```
 

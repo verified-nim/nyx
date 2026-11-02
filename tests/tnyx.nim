@@ -325,7 +325,7 @@ proc testInstall(tmp: Path) {.raises.} =
   for dir in p.dirs: created.add $dir
   check(p.dirs == @[root / path(".pi"), root / path(".pi/skills")],
         "created dirs recorded: " & created.join(","))
-  check(missing(p) == 0, "all intact")
+  check(intact(p, "alpha") and intact(p, "beta"), "all intact")
 
   # Deselect beta: its links go, the user's alpha stays.
   r = sync(p, store, @[path(".claude/skills"), path(".pi/skills")], @["alpha"])
@@ -388,7 +388,7 @@ proc testInstall(tmp: Path) {.raises.} =
   let g = u.root / path(".claude/skills/gamma")
   discard tryRemoveFile(g)
   mkfile(g / path("SKILL.md"), "replaced")
-  check(missing(u) == 1, "replaced install counts as missing")
+  check(not intact(u, "gamma"), "replaced install counts as missing")
   r = drop(u, @["gamma"])
   check(r.kept == @[g] and readFile($(g / path("SKILL.md"))) == "replaced",
     "replacement left alone")
@@ -404,7 +404,7 @@ proc testRetargetedLink(tmp: Path) {.raises.} =
   let inst = p.installs[0]
   check(tryRemoveFile(inst.path) == Success, "remove original installed link")
   createSymlink(other, inst.path)
-  check(missing(p) == 1 and not intact(inst), "retargeted link counts as missing")
+  check(not intact(p, "alpha") and not intact(inst), "retargeted link counts as missing")
   check(not unplace(inst) and expandSymlink(inst.path) == other,
         "removal leaves retargeted link alone")
   let r = sync(p, store, @[path(".claude/skills")], @["alpha"])

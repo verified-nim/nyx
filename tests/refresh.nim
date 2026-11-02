@@ -2,10 +2,6 @@
 include ../src/nyx
 import std/[files, osproc, streams, envvars]
 
-proc refresh(c: var Ctx): bool =
-  var changed: seq[string] = @[]
-  result = refresh(c, changed)
-
 proc mkfile(file: Path; text: string) {.raises.} =
   createDir(parentDir(file))
   writeFile($file, text)

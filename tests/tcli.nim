@@ -15,6 +15,14 @@ proc fail(msg: string) =
 template check(cond: bool; msg: string) =
   if not cond: fail(msg)
 
+proc count(s, sub: string): int =
+  ## Occurrences of `sub` in `s`.
+  result = 0
+  var i = s.find(sub)
+  while i >= 0:
+    inc result
+    i = s.find(sub, i + sub.len)
+
 proc mkfile(p: Path; content: string) {.raises.} =
   createDir(parentDir(p))
   writeFile($p, content)
@@ -86,7 +94,7 @@ proc main() {.raises.} =
   # With no agent detected, install uses both standard directories, without
   # flags or questions.
   (code, o) = nyx(e, app, ["install", "alpha", "beta", "alpha"])
-  check(code == 0 and "ready" in o, "install succeeds: " & o)
+  check(code == 0 and o.count("alpha") == 1 and "linked" in o, "install names each skill once: " & o)
   check(inBoth(app, "alpha") and inBoth(app, "beta"), "installed into both directories")
   var st = loadState(e.data).state
   check(st.projects.len == 1 and st.projects[0].skills == @["alpha", "beta"],
@@ -127,6 +135,7 @@ proc main() {.raises.} =
   check(code == 0 and not taken(app / path(".agents/skills/alpha")) and
         not taken(app / path(".claude/skills/alpha")) and inBoth(app, "beta") and "beta" in o,
         "remove takes out only the named skill: " & o)
+  check(o.count("alpha") == 1, "remove names a removed skill once: " & o)
 
   # Install adds: beta stays, the user's own skill stays and is not claimed.
   mkfile(app / path(".claude/skills/own/SKILL.md"), "mine")
@@ -146,7 +155,8 @@ proc main() {.raises.} =
   (code, o) = nyx(e, app, ["update"])
   check(code == 0 and "1 updated, 1 current" in o,
         "update summary covers the set: " & o)
-  check("alpha" notin o, "update does not list skills outside the set: " & o)
+  check("alpha" notin o and "delta" notin o, "update does not list skills nyx did not install: " & o)
+  check(o.count("beta") == 1, "update names an updated skill once: " & o)
   check("beta two" in readFile($(app / path(".agents/skills/beta/SKILL.md"))),
         "update reaches the installed skill")
 
@@ -162,12 +172,29 @@ proc main() {.raises.} =
   (code, o) = nyx(e, app, [])
   check(code == 0 and "beta three" in readFile($(app / path(".agents/skills/beta/SKILL.md"))),
         "bare fetches when due: " & o)
+  check("1 updated" in o and o.count("beta") == 2 and "checked" notin o,
+        "bare reports the update, then the set: " & o)
+
+  # Update covers every project, from anywhere: the clone is shared.
+  let side = tmp / path("side")
+  createDir(side)
+  (code, o) = nyx(e, side, ["install", "alpha"])
+  mkfile(e.origin / path("alpha/SKILL.md"), "---\ndescription: alpha three\n---\n")
+  commit(e.origin, "three and a half")
+  (code, o) = nyx(e, blank, ["update"])
+  check(code == 0 and "1 updated, 2 current" in o and "alpha" in o,
+        "update outside a project reports every project's skills: " & o)
+  (code, o) = nyx(e, app, ["update"])
+  check(code == 0 and "3 current" in o, "update inside a project covers the others too: " & o)
+  (code, o) = nyx(e, side, ["clear"])
 
   # A skill gone upstream needs no handling; the next install clears its link.
   git(e.origin, ["rm", "-rq", "gamma"])
   commit(e.origin, "four")
   (code, o) = nyx(e, app, ["update"])
-  check(code == 0, "update with a vanished skill: " & o)
+  check(code == 0 and "removed upstream" in o, "update with a vanished skill: " & o)
+  (code, o) = nyx(e, app, [])
+  check(code == 0 and "nyx install drops it" in o, "bare flags a vanished skill: " & o)
   (code, o) = nyx(e, app, ["install", "beta"])
   check(code == 0 and not symlinkExists(app / path(".agents/skills/gamma")) and inBoth(app, "beta"),
         "install drops a vanished skill: " & o)
