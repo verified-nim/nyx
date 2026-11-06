@@ -135,7 +135,7 @@
    {
     "name": "nimony-compiler-bug-fixing",
     "blurb": "Fixes a compiler failure in the stage that owns it, not where it surfaced.",
-    "chars": 436
+    "chars": 439
    },
    {
     "name": "nimony-compiler-validation",
@@ -146,6 +146,11 @@
     "name": "nimony-compiler-pr",
     "blurb": "Turns a compiler fix into a focused, checkable pull request.",
     "chars": 355
+   },
+   {
+    "name": "nimony-bug-reporting",
+    "blurb": "Tells a Nimony bug from a documented difference and files it where it belongs.",
+    "chars": 314
    },
    {
     "name": "nimony-nim2-differences",
