@@ -135,7 +135,7 @@
    {
     "name": "nimony-compiler-bug-fixing",
     "blurb": "Fixes a compiler failure in the stage that owns it, not where it surfaced.",
-    "chars": 439
+    "chars": 358
    },
    {
     "name": "nimony-compiler-validation",
