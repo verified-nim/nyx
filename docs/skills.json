@@ -246,6 +246,14 @@
     "chars": 323
    },
    {
+    "name": "nimony-porting",
+    "blurb": "Ports to Nimony with the stdlib only, recording its gaps instead of working around them.",
+    "langs": [
+     "nimony"
+    ],
+    "chars": 400
+   },
+   {
     "name": "nimony-nim2-differences",
     "blurb": "Fixes the errors Nim 2 habits cause in Nimony, from initialization to imports.",
     "langs": [
