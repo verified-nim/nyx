@@ -7,7 +7,7 @@
   const COLORS = ["blue", "yellow", "green", "coral", "violet"]; // by group index, so a row keeps its color in both views
   const LANGS = {
     nim: "Nim 2 skills for Claude Code, Codex, Cursor and more.",
-    nimony: "Nimony skills for Claude Code, Codex, Cursor and more. Shared Nim skills included.",
+    nimony: "Nimony skills for Claude Code, Codex, Cursor and more.",
   };
 
   let groups = [];
