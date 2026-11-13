@@ -7,7 +7,7 @@
   const COLORS = ["blue", "yellow", "green", "coral", "violet"]; // by group index, so a row keeps its color in both views
   const LANGS = {
     nim: "Nim 2 skills for Claude Code, Codex, Cursor and more.",
-    nimony: "Nimony skills, including the Nim ones that carry over.",
+    nimony: "Nimony skills for Claude Code, Codex, Cursor and more. Shared Nim skills included.",
   };
 
   let groups = [];
@@ -100,6 +100,7 @@
   function setLang(next) {
     lang = Object.hasOwn(LANGS, next) ? next : "nim";
     for (const b of $("lang").querySelectorAll("button")) b.setAttribute("aria-pressed", b.dataset.lang === lang);
+    $("lang").dataset.lang = lang;
     $("sub").textContent = LANGS[lang];
     if (!groups.length) return; // not loaded: keep the load message in place
     build();
