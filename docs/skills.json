@@ -242,7 +242,7 @@
     "langs": [
      "nim"
     ],
-    "chars": 323
+    "chars": 364
    },
    {
     "name": "nimony-porting",
@@ -250,7 +250,7 @@
     "langs": [
      "nimony"
     ],
-    "chars": 400
+    "chars": 360
    },
    {
     "name": "nimony-nim2-differences",
