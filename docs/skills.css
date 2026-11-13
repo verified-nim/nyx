@@ -50,38 +50,18 @@ button { font: inherit; }
 button:focus-visible { outline: 2px solid var(--ink); }
 .page { width: 100%; max-width: 1012px; margin-inline: auto; padding-inline: 24px; }
 
-/* Header and the language switch: a small pill whose thumb slides to the chosen side. */
+/* Header and the language switch: "Nimony" beside a small track; on shows the Nimony view. */
 header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-block: 16px 12px; }
 h1 { margin: 0; font-size: 1.25rem; font-weight: 700; }
 .sub { flex: 1; min-width: 0; margin: 0; color: var(--muted); font-size: 0.875rem; }
-.lang { position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 2px; border: 1px solid var(--line); border-radius: 999px; }
-.lang::before {
-  content: "";
-  position: absolute;
-  inset: 2px auto 2px 2px;
-  width: calc(50% - 2px);
-  background: var(--ink);
-  border-radius: inherit;
-  transition: transform 0.18s ease;
-}
-.lang[data-lang="nimony"]::before { transform: translateX(100%); }
-.lang button {
-  position: relative;
-  height: 28px;
-  padding-inline: 12px;
-  background: none;
-  border: 0;
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 0.18s ease;
-}
-.lang button:hover { color: var(--ink); }
-.lang button[aria-pressed="true"] { color: var(--paper); }
-.lang button:focus-visible { outline-offset: 1px; }
-@media (prefers-reduced-motion: reduce) { .lang::before, .lang button { transition: none; } }
+.lang { display: inline-flex; align-items: center; gap: 8px; padding: 4px; background: none; border: 0; border-radius: 4px; color: var(--muted); font-size: 0.875rem; cursor: pointer; }
+.lang:hover, .lang[aria-checked="true"] { color: var(--ink); }
+.lang:focus-visible { outline-offset: 2px; }
+.track { width: 26px; height: 14px; padding: 2px; background: var(--line); border-radius: 7px; transition: background-color 0.15s ease; }
+.track::after { content: ""; display: block; width: 10px; height: 10px; background: var(--muted); border-radius: 50%; transition: transform 0.15s ease, background-color 0.15s ease; }
+.lang[aria-checked="true"] .track { background: var(--ink); }
+.lang[aria-checked="true"] .track::after { background: var(--paper); transform: translateX(12px); }
+@media (prefers-reduced-motion: reduce) { .track, .track::after { transition: none; } }
 
 /* Table: only it scrolls if the window is too short. Each row gets --c from its
    group (set by the script), which its label and tiles inherit. */

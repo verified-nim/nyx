@@ -99,20 +99,18 @@
 
   function setLang(next) {
     lang = Object.hasOwn(LANGS, next) ? next : "nim";
-    for (const b of $("lang").querySelectorAll("button")) b.setAttribute("aria-pressed", b.dataset.lang === lang);
-    $("lang").dataset.lang = lang;
+    $("lang").setAttribute("aria-checked", lang === "nimony");
     $("sub").textContent = LANGS[lang];
     if (!groups.length) return; // not loaded: keep the load message in place
     build();
     render();
   }
 
-  // Nim is the default view, so it drops the hash; other languages deep-link as #lang.
-  $("lang").addEventListener("click", e => {
-    const b = e.target.closest("button");
-    if (!b || b.dataset.lang === lang) return;
-    history.replaceState(null, "", b.dataset.lang === "nim" ? location.pathname + location.search : "#" + b.dataset.lang);
-    setLang(b.dataset.lang);
+  // The switch flips between Nim and Nimony. Nim is the default view, so it drops the hash; Nimony deep-links as #nimony.
+  $("lang").addEventListener("click", () => {
+    const next = lang === "nim" ? "nimony" : "nim";
+    history.replaceState(null, "", next === "nim" ? location.pathname + location.search : "#" + next);
+    setLang(next);
   });
   window.addEventListener("hashchange", () => setLang(fromHash()));
 
