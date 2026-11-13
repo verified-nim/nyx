@@ -246,7 +246,7 @@
    },
    {
     "name": "nimony-porting",
-    "blurb": "Ports to Nimony with the stdlib only, recording its gaps instead of working around them.",
+    "blurb": "Ports to Nimony, recording its stdlib gaps and bugs instead of working around them.",
     "langs": [
      "nimony"
     ],
