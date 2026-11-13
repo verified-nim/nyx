@@ -1,5 +1,8 @@
 /* A periodic table of skills: one row per task group, above a dock with the selection
-   and the command. Fits the viewport on desktop; scrolls under the dock on small screens. */
+   and the command. A switch in the header picks Nim or Nimony. Fits the viewport on
+   desktop; scrolls under the dock on small screens. */
+
+/* Tokens */
 :root {
   color-scheme: light;
   --bg: #f5f6f8;
@@ -31,6 +34,7 @@
   }
 }
 
+/* Base */
 * { box-sizing: border-box; }
 body {
   margin: 0;
@@ -43,26 +47,40 @@ body {
 }
 a, button { color: inherit; }
 button { font: inherit; }
+button:focus-visible { outline: 2px solid var(--ink); }
 .page { width: 100%; max-width: 1012px; margin-inline: auto; padding-inline: 24px; }
 
-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding-block: 20px 12px; }
+/* Header and the two-way language switch: the pressed side is filled. */
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-block: 16px 12px; }
 h1 { margin: 0; font-size: 1.25rem; font-weight: 700; }
-.sub { margin: 0; color: var(--muted); font-size: 0.875rem; }
+.sub { flex: 1; min-width: 0; margin: 0; color: var(--muted); font-size: 0.875rem; }
+.lang { display: flex; padding: 2px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; }
+.lang button {
+  min-width: 72px;
+  height: 28px;
+  padding-inline: 12px;
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lang button:hover { color: var(--ink); }
+.lang button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.lang button:focus-visible { outline-offset: 1px; }
 
-/* Only the table scrolls if the window is too short for it. */
+/* Table: only it scrolls if the window is too short. Each row gets --c from its
+   group (set by the script), which its label and tiles inherit. */
 main { display: grid; align-content: start; gap: 10px; overflow-y: auto; }
-
-/* Each row sets --c, which its label and tiles inherit. */
-.row { --c: var(--blue); display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; }
-.row:nth-of-type(2) { --c: var(--yellow); }
-.row:nth-of-type(3) { --c: var(--green); }
-.row:nth-of-type(4) { --c: var(--coral); }
-.row:nth-of-type(5) { --c: var(--violet); }
+.row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; }
 .rhead { padding-left: 10px; border-left: 3px solid var(--c); }
 .rname { margin: 0; font-size: 0.9375rem; font-weight: 600; }
 .rprog { font-size: 0.75rem; color: var(--muted); }
 .row.done .rprog { color: var(--ink); font-weight: 600; }
 
+/* Tiles */
 .tiles { display: grid; grid-template-columns: repeat(9, 88px); grid-auto-rows: 96px; gap: 8px; }
 .tile {
   position: relative;
@@ -75,15 +93,15 @@ main { display: grid; align-content: start; gap: 10px; overflow-y: auto; }
   border-radius: 6px;
   cursor: pointer;
 }
-.no { font-size: 0.625rem; line-height: 12px; font-weight: 600; color: var(--muted); }
-.sym { align-self: center; font-size: 1.75rem; line-height: 1; font-weight: 800; letter-spacing: -0.02em; }
-.nm { font-size: 0.625rem; line-height: 12px; font-weight: 600; color: var(--muted); overflow-wrap: anywhere; hyphens: auto; }
 .tile:hover { background: color-mix(in srgb, var(--c) 28%, var(--paper)); }
-.tile:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.tile:focus-visible { outline-offset: -2px; }
 .tile.on { background: var(--c); border-color: transparent; color: #16171d; }
+.no, .nm { font-size: 0.625rem; line-height: 12px; font-weight: 600; color: var(--muted); }
 .tile.on .no, .tile.on .nm { color: inherit; }
+.sym { align-self: center; font-size: 1.75rem; line-height: 1; font-weight: 800; letter-spacing: -0.02em; }
+.nm { overflow-wrap: anywhere; hyphens: auto; }
 
-/* Small screens show the description as a bar at the top; desktop, beside the tile. */
+/* Tip: small screens show the description as a bar at the top; desktop, beside the tile. */
 .tip {
   display: none;
   position: fixed;
@@ -102,16 +120,16 @@ main { display: grid; align-content: start; gap: 10px; overflow-y: auto; }
 }
 .tile:hover .tip, .tile:focus-visible .tip { display: block; }
 
+/* Dock: selection stats on the left, the command on the right. */
 .dock { position: sticky; bottom: 0; background: var(--paper); border-top: 1px solid var(--line); }
 .dockin { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 32px; padding-block: 12px; }
-
-.statline { display: flex; justify-content: space-between; font-size: 0.75rem; line-height: 16px; color: var(--muted); }
+.statline, .note { font-size: 0.75rem; line-height: 16px; color: var(--muted); }
+.statline { display: flex; justify-content: space-between; }
 .statline b { color: var(--ink); font-weight: 600; }
 .meter { height: 4px; margin-block: 5px; background: var(--line); border-radius: 2px; overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--ink); }
 .full #rank, .full #chars { color: var(--alert); }
 .full .meter i { background: var(--alert); }
-
 .cmdrow { display: flex; gap: 8px; }
 .cmd {
   flex: 1;
@@ -139,13 +157,16 @@ main { display: grid; align-content: start; gap: 10px; overflow-y: auto; }
   cursor: pointer;
 }
 .copy:enabled:hover { opacity: 0.85; }
-.copy:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.copy:focus-visible { outline-offset: 2px; }
 .copy:disabled { background: var(--line); color: var(--muted); cursor: default; }
-.note { margin-top: 4px; font-size: 0.75rem; line-height: 16px; color: var(--muted); }
+.note { margin-top: 4px; }
 
+/* Small screens: the page scrolls, rows stack their label above the tiles. */
 @media (max-width: 1023px) {
-  .page { padding-inline: 16px; }
   body { height: auto; min-height: 100dvh; }
+  .page { padding-inline: 16px; }
+  .sub { order: 1; flex-basis: 100%; }
+  .lang { margin-left: auto; }
   main { gap: 16px; overflow: visible; }
   .row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .rhead { display: flex; align-items: baseline; gap: 8px; padding-left: 8px; }
@@ -153,6 +174,7 @@ main { display: grid; align-content: start; gap: 10px; overflow-y: auto; }
   .dockin { grid-template-columns: minmax(0, 1fr); gap: 8px; padding-block: 10px; }
 }
 
+/* Desktop: the tip hangs below the tile, flipping left on the right half and up on the bottom rows. */
 @media (min-width: 1024px) {
   .tip { position: absolute; top: calc(100% + 6px); left: 0; right: auto; width: 240px; }
   .tile:nth-child(n+6) .tip { left: auto; right: 0; }
