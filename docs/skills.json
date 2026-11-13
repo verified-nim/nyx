@@ -240,8 +240,7 @@
     "name": "nim-porting",
     "blurb": "Moves a module from another language while freezing behavior with tests.",
     "langs": [
-     "nim",
-     "nimony"
+     "nim"
     ],
     "chars": 323
    },
