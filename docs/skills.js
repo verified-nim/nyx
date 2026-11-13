@@ -33,20 +33,20 @@
   }
 
   // Initials, or the first two letters when the row has already used those initials.
-  function symbol(name, used) {
-    const w = short(name).split("-");
+  function symbol(label, used) {
+    const w = label.split("-");
     const initials = w.length > 1 ? titleCase(w[0][0] + w[1][0]) : "";
     const s = initials && !used.has(initials) ? initials : titleCase(w[0].slice(0, 2));
     used.add(s);
     return s;
   }
 
-  function tile(s, no, used) {
+  function tile(s, label, no, used) {
     const t = el("button", "tile");
     t.type = "button";
     t.dataset.name = s.name;
     t.setAttribute("aria-label", s.name + ". " + s.blurb);
-    t.append(el("span", "no", String(no)), el("span", "sym", symbol(s.name, used)), el("span", "nm", short(s.name)), el("span", "tip", s.blurb));
+    t.append(el("span", "no", String(no)), el("span", "sym", symbol(label, used)), el("span", "nm", label), el("span", "tip", s.blurb));
     return t;
   }
 
@@ -60,7 +60,10 @@
       const row = el("section", "row"), head = el("div", "rhead"), tiles = el("div", "tiles"), used = new Set();
       row.style.setProperty("--c", `var(--${COLORS[i % COLORS.length]})`);
       head.append(el("h2", "rname", group), el("div", "rprog"));
-      tiles.append(...list.map(s => tile(s, ++no, used)));
+      // Short names, except a skill from the other language keeps its full name when one of this
+      // language's skills shortens the same way (nim-porting beside nimony-porting).
+      const label = ({ name }) => list.some(o => o.name !== name && short(o.name) === short(name)) && !name.startsWith(lang + "-") ? name : short(name);
+      tiles.append(...list.map(s => tile(s, label(s), ++no, used)));
       row.append(head, tiles);
       shown.push([row, list.map(s => s.name)]);
       return [row];
