@@ -1,184 +1,311 @@
-/* A periodic table of skills: one row per task group, above a dock with the selection
-   and the command. A switch in the header picks Nim or Nimony. Fits the viewport on
-   desktop; scrolls under the dock on small screens. */
+/* Skill Table, styled after GNOME's libadwaita: a header bar with a switch for the Nimony
+   view, a periodic table of skills (one row per task group), and a bottom bar with the
+   selection and the install command. Sections: tokens, base, header bar, table, tiles,
+   tip, bottom bar, toast, adaptive. */
 
-/* Tokens */
+/* ---- Tokens: libadwaita's names and values, so light, dark and high contrast follow. ---- */
 :root {
-  color-scheme: light;
-  --bg: #f5f6f8;
-  --paper: #ffffff;
-  --ink: #16171d;
-  --muted: #5c5f6e;
-  --line: #16171d24;
-  --alert: #c8391a;
-  --on-c: #16171d; /* text on a group color: dark in both schemes, since the colors stay light */
-  --blue: oklch(0.86 0.08 250);
-  --yellow: oklch(0.87 0.1 90);
-  --green: oklch(0.87 0.09 160);
-  --coral: oklch(0.84 0.09 28);
-  --violet: oklch(0.85 0.08 305);
+  color-scheme: light dark;
+
+  --window-bg-color: light-dark(#fafafb, #222226);
+  --window-fg-color: light-dark(rgb(0 0 6 / 80%), #fff);
+  --view-bg-color: light-dark(#fff, #1d1d20);
+  --card-bg-color: light-dark(#fff, rgb(255 255 255 / 8%));
+  --card-shade-color: light-dark(rgb(0 0 6 / 7%), rgb(0 0 6 / 36%));
+  --headerbar-bg-color: light-dark(#fff, #2e2e32);
+  --headerbar-shade-color: light-dark(rgb(0 0 6 / 12%), rgb(0 0 6 / 36%));
+  --accent-bg-color: #1c71d8; /* GNOME blue 4: white text on the default #3584e4 measures 3.8:1 */
+  --accent-fg-color: #fff;
+  --accent-color: light-dark(#0461be, #81d0ff); /* accent as text or outline */
+  --destructive-bg-color: light-dark(#e01b24, #c01c28);
+  --error-color: light-dark(#c30000, #ff938c);
+  --osd-bg-color: light-dark(#303034, #46464b); /* tooltips and toasts; opaque, so tiles do not show through */
+  --osd-fg-color: #fff;
+
+  --border-opacity: 15%;
+  --dim-opacity: 70%; /* libadwaita has 55%, which fails 4.5:1 for small text on the light window */
+  --disabled-opacity: 50%;
+  --border-color: color-mix(in srgb, currentColor var(--border-opacity), transparent);
+  --dim-color: color-mix(in srgb, currentColor var(--dim-opacity), transparent);
+  --trough-color: color-mix(in srgb, currentColor 10%, transparent);
+  /* Opaque, where libadwaita uses 50%: a web page has to pass 3:1 against the window. */
+  --focus-color: var(--accent-color);
+
+  --card-shadow: 0 0 0 1px rgb(0 0 6 / 3%), 0 1px 3px 1px var(--card-shade-color), 0 2px 6px 2px rgb(0 0 6 / 3%);
+  --button-radius: 9px;
+  --card-radius: 12px;
+  --pill-radius: 9999px;
+
+  --gap: 6px; /* between tiles, and inside controls */
+  --pad: 12px; /* the clamp's side margin on narrow windows */
+  --control-height: 34px;
+  --clamp-width: 1024px;
+  --tile-width: 88px; /* three across a 360px phone, nine across a 1024px window */
+  --tile-height: 96px;
+  --row-gap: 18px;
+
+  --font-sans: "Adwaita Sans", Inter, Cantarell, system-ui, sans-serif;
+  --font-mono: "Adwaita Mono", "Source Code Pro", ui-monospace, monospace;
+  --font-body: 0.9375rem; /* 11pt, the GNOME document size */
+  --font-caption: 0.8125rem;
+  --font-tile: 0.625rem;
+
+  --ease: cubic-bezier(0.25, 0.46, 0.45, 0.94); /* ease-out-quad */
+  --duration: 200ms;
 }
-@media (prefers-color-scheme: dark) {
+@media (prefers-contrast: more) {
   :root {
-    color-scheme: dark;
-    --bg: #101116;
-    --paper: #1a1b22;
-    --ink: #eceef3;
-    --muted: #a0a3b3;
-    --line: #eceef329;
-    --alert: #ff7a5c;
-    --blue: oklch(0.76 0.1 250);
-    --yellow: oklch(0.79 0.11 90);
-    --green: oklch(0.78 0.11 160);
-    --coral: oklch(0.74 0.11 28);
-    --violet: oklch(0.75 0.1 305);
+    --border-opacity: 50%;
+    --dim-opacity: 90%;
+    --disabled-opacity: 40%;
+    --accent-bg-color: #1a5fb4;
+    --window-fg-color: light-dark(#000006, #fff);
+    --card-shadow: 0 0 0 1px var(--border-color);
   }
 }
+@media (prefers-reduced-motion: reduce) { :root { --duration: 0s; } }
+/* Touch: 44px targets. Tiles are already taller; the switch grows its hit area instead. */
+@media (pointer: coarse) { :root { --control-height: 44px; } }
 
-/* Base */
+/* Group colors from the Adwaita accent palette: --c-bg fills, --c is the text-safe variant. */
+.blue { --c-bg: #3584e4; --c: light-dark(#0461be, #81d0ff); }
+.yellow { --c-bg: #c88800; --c: light-dark(#905300, #ffc057); }
+.green { --c-bg: #3a944a; --c: light-dark(#15772e, #8de698); }
+.red { --c-bg: #e62d42; --c: light-dark(#c00023, #ff888c); }
+.purple { --c-bg: #9141ac; --c: light-dark(#8939a4, #fba7ff); }
+
+/* ---- Base: the page scrolls under a sticky bottom bar; see Adaptive for the desktop fit. ---- */
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  height: 100dvh;
+  min-height: 100dvh;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  background: var(--bg);
-  color: var(--ink);
-  font: 16px/1.4 system-ui, sans-serif;
+  background: var(--window-bg-color);
+  color: var(--window-fg-color);
+  font: var(--font-body)/1.4 var(--font-sans);
 }
-a, button { color: inherit; }
+h1, h2, p { margin: 0; }
+a { color: var(--accent-color); }
 /* No tap highlight: Chrome on Android paints its default one, a translucent blue, over a
    button while it is pressed. The tiles and buttons show their own state instead. */
-button { font: inherit; -webkit-tap-highlight-color: transparent; }
-button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-.page { width: 100%; max-width: 1012px; margin-inline: auto; padding-inline: 24px; }
+button { font: inherit; color: inherit; border: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+:focus-visible { outline: 2px solid var(--focus-color); outline-offset: 2px; }
+/* AdwClamp: content keeps a centered maximum width. */
+.clamp { width: 100%; max-width: var(--clamp-width); margin-inline: auto; padding-inline: var(--pad); }
+.bar { background: var(--headerbar-bg-color); }
 
-/* Header and the language switch: "Nimony" beside a small track; on shows the Nimony view. */
-header { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding-block: 16px 12px; }
-h1 { margin: 0; font-size: 1.25rem; font-weight: 700; }
-.sub { flex: 1; min-width: 0; margin: 0; color: var(--muted); font-size: 0.875rem; }
-.lang { display: inline-flex; align-items: center; gap: 8px; padding: 4px; background: none; border: 0; border-radius: 4px; color: var(--muted); font-size: 0.875rem; cursor: pointer; }
-.lang:hover, .lang[aria-checked="true"] { color: var(--ink); }
-.track { width: 26px; height: 14px; padding: 2px; background: var(--line); border-radius: 7px; transition: background-color 0.15s ease; }
-.track::after { content: ""; display: block; width: 10px; height: 10px; background: var(--muted); border-radius: 50%; transition: transform 0.15s ease, background-color 0.15s ease; }
-.lang[aria-checked="true"] .track { background: var(--ink); }
-.lang[aria-checked="true"] .track::after { background: var(--paper); transform: translateX(12px); }
-@media (prefers-reduced-motion: reduce) { .track, .track::after { transition: none; } }
+/* ---- Header bar: title and subtitle at the start, the Nimony switch at the end. ---- */
+header { box-shadow: 0 1px var(--headerbar-shade-color); }
+header .clamp {
+  display: grid;
+  grid-template: "title switch" "sub sub" / minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--pad);
+  min-height: 47px;
+  padding-block: var(--gap);
+}
+h1 { font-size: 1.125rem; font-weight: 700; line-height: 1.25; }
+#sub { grid-area: sub; color: var(--dim-color); font-size: var(--font-caption); }
 
-/* Table: only it scrolls if the window is too short. Each row gets --c from its
-   group (set by the script), which its label and tiles inherit. */
-main { display: grid; align-content: start; gap: 10px; overflow-y: auto; }
-.row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; }
-.rhead { padding-left: 10px; border-left: 3px solid var(--c); }
-.rname { margin: 0; font-size: 0.9375rem; font-weight: 600; }
-.rprog { font-size: 0.75rem; color: var(--muted); }
-.row.done .rprog { color: var(--ink); font-weight: 600; }
+/* GtkSwitch with its label before it; the two are one target. */
+.switch { grid-area: switch; position: relative; display: flex; align-items: center; gap: 12px; padding: 0; background: none; }
+.switch::before { content: ""; position: absolute; inset: 50% 0 auto; height: var(--control-height); translate: 0 -50%; }
+.track {
+  width: 46px;
+  height: 26px;
+  padding: 3px;
+  background: color-mix(in srgb, currentColor 15%, transparent);
+  border-radius: 14px;
+  transition: background-color var(--duration) var(--ease);
+}
+.track::after {
+  content: "";
+  display: block;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgb(0 0 6 / 20%);
+  transition: translate var(--duration) var(--ease);
+}
+@media (hover: hover) { .switch:hover .track { background: color-mix(in srgb, currentColor 20%, transparent); } }
+.switch:active .track { background: color-mix(in srgb, currentColor 25%, transparent); }
+.switch[aria-checked="true"] .track { background: var(--accent-bg-color); }
+.switch[aria-checked="true"] .track::after { translate: 20px; }
+/* The focus ring goes around the track, as on a GtkSwitch, not around the label. */
+.switch:focus-visible { outline: 0; }
+.switch:focus-visible .track { outline: 2px solid var(--focus-color); outline-offset: 2px; }
+@media (prefers-contrast: more) { .switch[aria-checked="false"] .track { box-shadow: inset 0 0 0 1px var(--border-color); } }
 
-/* Tiles */
-.tiles { display: grid; grid-template-columns: repeat(9, 88px); grid-auto-rows: 96px; gap: 8px; }
+/* ---- Table: each row takes --c and --c-bg from its group's color class. ---- */
+#rows { display: grid; align-content: start; gap: var(--row-gap); padding-block: var(--row-gap); }
+.row { display: grid; gap: var(--gap); }
+.rhead { display: flex; align-items: baseline; gap: var(--gap); }
+.rhead::before { content: ""; align-self: center; width: 10px; height: 10px; background: var(--c-bg); border-radius: 50%; }
+.rname { font-size: inherit; font-weight: 700; }
+.rprog { color: var(--dim-color); font-size: var(--font-caption); font-variant-numeric: tabular-nums; }
+.row.done .rprog { color: inherit; font-weight: 700; }
+.status { padding-block: 48px; text-align: center; }
+
+/* ---- Tiles: activatable cards laid out like elements: number, symbol, name. ---- */
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--tile-width), 1fr)); grid-auto-rows: var(--tile-height); gap: var(--gap); }
 .tile {
   position: relative;
   padding: 6px 7px 7px;
   display: grid;
   grid-template-rows: 12px 1fr 24px; /* number, symbol, two lines of name */
-  text-align: left;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  cursor: pointer;
+  text-align: start;
+  background: var(--card-bg-color);
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+  transition: background-color var(--duration) var(--ease);
 }
 /* Hover tint only where hover is real: on touch, :hover sticks to the last tapped tile and
    leaves a deselected tile looking half selected. */
-@media (hover: hover) { .tile:hover { background: color-mix(in srgb, var(--c) 28%, var(--paper)); } }
-/* The ring takes the tile's text color, so it stays dark on a selected tile in dark mode. */
-.tile:focus-visible { outline-color: currentColor; outline-offset: -2px; }
-.tile.on { background: var(--c); border-color: transparent; color: var(--on-c); }
-.no, .nm { font-size: 0.625rem; line-height: 12px; font-weight: 600; color: var(--muted); }
-.tile.on .no, .tile.on .nm { color: inherit; }
+@media (hover: hover) { .tile:hover { background: color-mix(in srgb, var(--c-bg) 10%, var(--card-bg-color)); } }
+.tile:active { background: color-mix(in srgb, var(--c-bg) 18%, var(--card-bg-color)); }
+/* Selected: a tint, a ring, a colored symbol and a check, so the state never rests on color alone. */
+.tile.on { background: color-mix(in srgb, var(--c-bg) 20%, var(--card-bg-color)); box-shadow: inset 0 0 0 2px var(--c-bg); }
+.tile.on::after {
+  content: "";
+  position: absolute;
+  inset: 6px 6px auto auto;
+  width: 14px;
+  height: 14px;
+  background: var(--c-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 8.5l2.8 2.8L12 5.2' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain;
+  border-radius: 50%;
+}
+.no, .nm { font-size: var(--font-tile); line-height: 12px; font-weight: 600; }
+.no { color: var(--dim-color); font-variant-numeric: tabular-nums; }
 .sym { align-self: center; font-size: 1.75rem; line-height: 1; font-weight: 800; letter-spacing: -0.02em; }
 .nm { overflow-wrap: anywhere; hyphens: auto; }
+.tile.on .sym { color: var(--c); }
+.tile.on .nm { font-weight: 700; }
 
-/* Tip: small screens show the description as a bar at the top; desktop, beside the tile. */
+/* ---- Tip: the skill's description. A bar at the top of the window by default; with a real
+   pointer and anchor positioning, a tooltip above the tile that flips at the edges. ---- */
 .tip {
   display: none;
   position: fixed;
-  z-index: 1;
-  top: 8px;
-  left: 8px;
-  right: 8px;
-  padding: 8px 10px;
-  background: var(--ink);
-  color: var(--paper);
-  border-radius: 6px;
-  font-size: 0.8125rem;
-  line-height: 1.35;
+  z-index: 2; /* above the bottom bar */
+  inset: var(--pad) var(--pad) auto;
+  max-width: 480px;
+  margin-inline: auto;
+  padding: 8px 12px;
+  background: var(--osd-bg-color);
+  color: var(--osd-fg-color);
+  border-radius: var(--button-radius);
+  font-size: var(--font-caption);
   pointer-events: none;
 }
 .tile:hover .tip, .tile:focus-visible .tip { display: block; }
+@media (hover: hover) {
+  @supports (position-area: bottom) and (anchor-scope: --tile) {
+    .tile { anchor-name: --tile; anchor-scope: --tile; }
+    .tip {
+      position-anchor: --tile;
+      position-area: top span-right; /* above, so it never covers the bottom bar */
+      position-try-fallbacks: flip-inline, flip-block, flip-block flip-inline;
+      inset: auto;
+      width: 240px;
+      margin: var(--gap) 0;
+    }
+  }
+}
 
-/* Dock: selection stats on the left, the command on the right. */
-.dock { position: sticky; bottom: 0; background: var(--paper); border-top: 1px solid var(--line); }
-.dockin { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 32px; padding-block: 12px; }
-.statline, .note { font-size: 0.75rem; line-height: 16px; color: var(--muted); }
-.statline { display: flex; justify-content: space-between; }
-.statline b { color: var(--ink); font-weight: 600; }
-.meter { height: 4px; margin-block: 5px; background: var(--line); border-radius: 2px; overflow: hidden; }
-.meter i { display: block; height: 100%; background: var(--ink); }
-.full #rank, .full #chars { color: var(--alert); }
-.full .meter i { background: var(--alert); }
-.cmdrow { display: flex; gap: 8px; }
+/* ---- Bottom bar: the selection and its context meter, then the command. ---- */
+.dock { position: sticky; z-index: 1; bottom: 0; box-shadow: 0 -1px var(--headerbar-shade-color); }
+.dock .clamp { display: grid; gap: var(--gap); padding-block: 10px; }
+.stat {
+  display: grid;
+  grid-template: "rank count chars" "meter meter meter" / auto 1fr auto;
+  align-items: baseline;
+  gap: var(--gap) 8px;
+  font-size: var(--font-caption);
+  font-variant-numeric: tabular-nums;
+}
+#rank { grid-area: rank; font-weight: 700; }
+#count { grid-area: count; color: var(--dim-color); }
+#chars { grid-area: chars; color: var(--dim-color); }
+.meter { grid-area: meter; height: 8px; background: var(--trough-color); border-radius: var(--pill-radius); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent-bg-color); border-radius: inherit; transition: width var(--duration) var(--ease); }
+/* Over budget: the rank reads "Context Full" as well as turning red. */
+.full #rank, .full #chars { color: var(--error-color); }
+.full #chars { font-weight: 700; }
+.full .meter i { background: var(--destructive-bg-color); }
+
+.cmdrow { display: flex; gap: var(--gap); min-width: 0; }
 .cmd {
   flex: 1;
   min-width: 0;
-  height: 36px;
+  height: var(--control-height);
   padding-inline: 10px;
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  font: 0.8125rem/34px ui-monospace, monospace;
+  background: var(--view-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--button-radius);
+  font: var(--font-caption)/calc(var(--control-height) - 2px) var(--font-mono);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   user-select: all;
 }
-.cmd.empty { color: var(--muted); }
+.cmd.empty { color: var(--dim-color); font-family: inherit; }
+/* Suggested action: the one accent button. */
 .copy {
-  width: 76px;
-  background: var(--ink);
-  color: var(--paper);
-  border: 0;
-  border-radius: 6px;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
+  position: relative;
+  height: var(--control-height);
+  padding: 0 20px;
+  background: var(--accent-bg-color);
+  color: var(--accent-fg-color);
+  border-radius: var(--button-radius);
+  font-weight: 700;
 }
-.copy:enabled:hover { opacity: 0.85; }
-.copy:disabled { background: var(--line); color: var(--muted); cursor: default; }
-.note { margin-top: 4px; }
+.copy::after { content: ""; position: absolute; inset: 0; border-radius: inherit; transition: background-color var(--duration) var(--ease); }
+.copy:hover::after { background: rgb(255 255 255 / 10%); }
+.copy:active::after { background: rgb(0 0 6 / 20%); }
+.copy:disabled { opacity: var(--disabled-opacity); cursor: default; }
+.copy:disabled::after { display: none; }
+.note { color: var(--dim-color); font-size: var(--font-caption); }
 
-/* Small screens: the page scrolls, rows stack their label above the tiles. */
-@media (max-width: 1023px) {
-  body { height: auto; min-height: 100dvh; }
-  .page { padding-inline: 16px; }
-  .sub { order: 1; flex-basis: 100%; }
-  .lang { margin-left: auto; }
-  main { gap: 16px; overflow: visible; }
-  .row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
-  .rhead { display: flex; align-items: baseline; gap: 8px; padding-left: 8px; }
-  .tiles { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); }
-  .dockin { grid-template-columns: minmax(0, 1fr); gap: 8px; padding-block: 10px; }
+/* ---- Toast: a brief confirmation floating over the bottom bar. ---- */
+.toast {
+  position: absolute;
+  bottom: calc(100% + var(--pad));
+  left: 50%;
+  max-width: calc(100% - 2 * var(--pad));
+  padding: 8px 16px;
+  background: var(--osd-bg-color);
+  color: var(--osd-fg-color);
+  border-radius: var(--pill-radius);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  translate: -50% 8px;
+  transition: opacity var(--duration) var(--ease), translate var(--duration) var(--ease);
 }
+.toast.show { opacity: 1; translate: -50% 0; }
 
-/* Touch: 44px tap targets. The switch grows its hit area, not its box, so the header keeps its size. */
-@media (pointer: coarse) {
-  .lang { position: relative; }
-  .lang::before { content: ""; position: absolute; inset: 50% 0 auto; height: 44px; translate: 0 -50%; }
-  .cmd { height: 44px; line-height: 42px; }
+/* ---- Adaptive: widths follow libadwaita's breakpoints; nothing depends on the input device. ---- */
+@media (min-width: 550px) {
+  :root { --pad: 24px; }
 }
-
-/* Desktop: the tip hangs below the tile, flipping left on the right half and up on the bottom rows. */
+/* Wide: group labels move beside their tiles, and the bottom bar splits in two. */
+@media (min-width: 860px) {
+  :root { --row-gap: 12px; } /* four rows fit a 1024×600 window without scrolling */
+  header .clamp { grid-template-areas: "title switch" "sub switch"; row-gap: 0; }
+  .row { grid-template-columns: 112px minmax(0, 1fr); gap: var(--pad); }
+  .rhead { display: grid; grid-template-columns: auto 1fr; align-content: start; padding-top: var(--gap); }
+  .rprog { grid-column: 2; }
+  .dock .clamp { grid-template: "stat cmd" "stat note" / 300px minmax(0, 1fr); gap: 4px 32px; padding-block: 14px; }
+  .stat { grid-area: stat; grid-template: "rank count" "meter meter" "chars chars" / 1fr auto; align-content: center; }
+}
+/* A full row of nine fixed tiles fits beside the labels. */
 @media (min-width: 1024px) {
-  .tip { position: absolute; top: calc(100% + 6px); left: 0; right: auto; width: 240px; }
-  .tile:nth-child(n+6) .tip { left: auto; right: 0; }
-  .row:nth-of-type(n+4) .tip { top: auto; bottom: calc(100% + 6px); }
+  .tiles { grid-template-columns: repeat(9, var(--tile-width)); }
+}
+/* Desktop: the window is the page, and only the table scrolls. */
+@media (min-width: 860px) and (min-height: 560px) {
+  body { height: 100dvh; }
+  main { overflow-y: auto; }
 }

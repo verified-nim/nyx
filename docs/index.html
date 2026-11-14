@@ -11,29 +11,33 @@
 <link rel="stylesheet" href="skills.css">
 </head>
 <body>
-<header class="page">
-  <h1>Skill Table</h1>
-  <p class="sub" id="sub">Nim 2 skills for Claude Code, Codex, Cursor and more.</p>
-  <button class="lang" id="lang" type="button" role="switch" aria-checked="false">Nimony<span class="track" aria-hidden="true"></span></button>
-</header>
-<main class="page" id="rows">
-  <noscript><p>This page needs JavaScript. You can also name skills directly: <code>nyx install nim-testing nim-style-guide</code></p></noscript>
-</main>
-<footer class="dock">
-  <div class="page dockin">
-    <div class="stat" id="stat">
-      <div class="statline"><b id="rank"></b><span id="count"></span></div>
-      <div class="meter"><i id="meter"></i></div>
-      <div class="statline" id="chars"></div>
-    </div>
-    <div>
-      <div class="cmdrow">
-        <div class="cmd" id="cmd"></div>
-        <button class="copy" id="copy" type="button" aria-live="polite">Copy</button>
-      </div>
-      <div class="note">Run in your project root. Needs <a href="https://github.com/verified-nim/nyx">nyx</a> and a <a href="https://verified-nim.github.io/get-access.html">subscription</a>.</div>
-    </div>
+<header class="bar">
+  <div class="clamp">
+    <h1>Skill Table</h1>
+    <p id="sub">Nim 2 skills for Claude Code, Codex, Cursor and more</p>
+    <button class="switch" id="lang" type="button" role="switch" aria-checked="false">Nimony<span class="track" aria-hidden="true"></span></button>
   </div>
+</header>
+<main>
+  <div class="clamp" id="rows">
+    <noscript><p class="status">This page needs JavaScript. Skills can also be named directly: <code>nyx install nim-testing nim-style-guide</code></p></noscript>
+  </div>
+</main>
+<footer class="bar dock">
+  <div class="clamp">
+    <div class="stat" id="stat">
+      <b id="rank"></b>
+      <span id="count"></span>
+      <span id="chars"></span>
+      <div class="meter"><i id="meter"></i></div>
+    </div>
+    <div class="cmdrow">
+      <div class="cmd" id="cmd"></div>
+      <button class="copy" id="copy" type="button">Copy</button>
+    </div>
+    <p class="note">Run in the project root. Needs <a href="https://github.com/verified-nim/nyx">nyx</a> and a <a href="https://verified-nim.github.io/get-access.html">subscription</a>.</p>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </footer>
 <script src="skills.js"></script>
 </body>

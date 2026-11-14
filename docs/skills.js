@@ -3,11 +3,11 @@
   "use strict";
 
   const CAP = 8000; // listing budget in characters
-  const RANKS = [[10, "Large set"], [6, "Broad set"], [3, "Focused set"], [1, "Light set"], [0, "Nothing selected"]];
-  const COLORS = ["blue", "yellow", "green", "coral", "violet"]; // by group index, so a row keeps its color in both views
+  const RANKS = [[10, "Large Set"], [6, "Broad Set"], [3, "Focused Set"], [1, "Light Set"], [0, "Nothing Selected"]];
+  const COLORS = ["blue", "yellow", "green", "red", "purple"]; // Adwaita accents, by group index, so a row keeps its color in both views
   const LANGS = {
-    nim: "Nim 2 skills for Claude Code, Codex, Cursor and more.",
-    nimony: "Nimony skills for Claude Code, Codex, Cursor and more.",
+    nim: "Nim 2 skills for Claude Code, Codex, Cursor and more",
+    nimony: "Nimony skills for Claude Code, Codex, Cursor and more",
   };
 
   let groups = [];
@@ -15,7 +15,7 @@
   let shown = []; // [row element, skill names] for the current view
   const sel = new Set(); // kept across views; only the shown part counts
   const sizes = {}; // name -> listing characters
-  let copyTimer = 0;
+  let toastTimer = 0;
 
   const $ = id => document.getElementById(id);
   const fmt = n => n.toLocaleString("en-US");
@@ -57,8 +57,7 @@
     const rows = groups.flatMap(({ group, skills }, i) => {
       const list = skills.filter(s => s.langs.includes(lang));
       if (!list.length) return [];
-      const row = el("section", "row"), head = el("div", "rhead"), tiles = el("div", "tiles"), used = new Set();
-      row.style.setProperty("--c", `var(--${COLORS[i % COLORS.length]})`);
+      const row = el("section", "row " + COLORS[i % COLORS.length]), head = el("div", "rhead"), tiles = el("div", "tiles"), used = new Set();
       head.append(el("h2", "rname", group), el("div", "rprog"));
       tiles.append(...list.map(s => tile(s, ++no, used)));
       row.append(head, tiles);
@@ -85,14 +84,14 @@
     const count = picked.length;
     const chars = picked.reduce((s, n) => s + sizes[n], 0);
     const full = chars > CAP;
-    $("rank").textContent = full ? "Context full" : RANKS.find(r => count >= r[0])[1];
+    $("rank").textContent = full ? "Context Full" : RANKS.find(r => count >= r[0])[1];
     $("count").textContent = `${count} of ${total}`;
     $("chars").textContent = `${fmt(chars)} / ${fmt(CAP)} context`;
     $("stat").classList.toggle("full", full);
     $("meter").style.width = Math.min(100, chars / CAP * 100) + "%";
     const cmd = $("cmd");
     cmd.classList.toggle("empty", !count);
-    cmd.textContent = count ? command(picked) : "Select skills to build your install command";
+    cmd.textContent = count ? command(picked) : "Select skills to build the install command";
     cmd.title = count ? cmd.textContent : "";
     $("copy").disabled = !count;
   }
@@ -122,16 +121,22 @@
     render();
   });
 
+  // A toast: the live region announces the text, and it fades out on its own.
+  function toast(text) {
+    const t = $("toast");
+    t.textContent = text;
+    t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("show"), 2000);
+  }
+
   $("copy").addEventListener("click", async () => {
-    const copy = $("copy");
     try {
       await navigator.clipboard.writeText(command());
-      copy.textContent = "Copied";
+      toast("Command Copied");
     } catch {
-      copy.textContent = "Blocked";
+      toast("Clipboard Access Blocked");
     }
-    clearTimeout(copyTimer);
-    copyTimer = setTimeout(() => { copy.textContent = "Copy"; }, 1500);
   });
 
   render();
@@ -142,5 +147,5 @@
       for (const { skills } of groups) for (const s of skills) sizes[s.name] = s.chars + s.name.length;
       setLang(fromHash());
     })
-    .catch(() => { $("rows").append(el("p", "", "The skills didn't load. Reload the page to try again.")); });
+    .catch(() => { $("rows").append(el("p", "status", "The skills didn’t load. Reload the page to try again.")); });
 })();
