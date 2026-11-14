@@ -28,6 +28,10 @@
   --border-color: color-mix(in srgb, currentColor var(--border-opacity), transparent);
   --dim-color: color-mix(in srgb, currentColor var(--dim-opacity), transparent);
   --trough-color: color-mix(in srgb, currentColor 10%, transparent);
+  /* GtkSwitch trough: off, hovered, pressed. */
+  --switch-color: color-mix(in srgb, currentColor 15%, transparent);
+  --switch-hover-color: color-mix(in srgb, currentColor 20%, transparent);
+  --switch-active-color: color-mix(in srgb, currentColor 25%, transparent);
   /* Opaque, where libadwaita uses 50%: a web page has to pass 3:1 against the window. */
   --focus-color: var(--accent-color);
 
@@ -43,6 +47,9 @@
   --tile-width: 88px; /* three across a 360px phone, nine across a 1024px window */
   --tile-height: 96px;
   --row-gap: 18px;
+  --header-height: 47px;
+  --label-width: 112px; /* group labels beside the tiles, from 860px */
+  --stat-width: 300px; /* the selection column of the wide bottom bar */
 
   --font-sans: "Adwaita Sans", Inter, Cantarell, system-ui, sans-serif;
   --font-mono: "Adwaita Mono", "Source Code Pro", ui-monospace, monospace;
@@ -102,7 +109,7 @@ header .clamp {
   grid-template: "title switch" "sub sub" / minmax(0, 1fr) auto;
   align-items: center;
   gap: 2px var(--pad);
-  min-height: 47px;
+  min-height: var(--header-height);
   padding-block: var(--gap);
 }
 h1 { font-size: 1.125rem; font-weight: 700; line-height: 1.25; }
@@ -115,7 +122,7 @@ h1 { font-size: 1.125rem; font-weight: 700; line-height: 1.25; }
   width: 46px;
   height: 26px;
   padding: 3px;
-  background: color-mix(in srgb, currentColor 15%, transparent);
+  background: var(--switch-color);
   border-radius: 14px;
   transition: background-color var(--duration) var(--ease);
 }
@@ -129,8 +136,8 @@ h1 { font-size: 1.125rem; font-weight: 700; line-height: 1.25; }
   box-shadow: 0 2px 4px rgb(0 0 6 / 20%);
   transition: translate var(--duration) var(--ease);
 }
-@media (hover: hover) { .switch:hover .track { background: color-mix(in srgb, currentColor 20%, transparent); } }
-.switch:active .track { background: color-mix(in srgb, currentColor 25%, transparent); }
+@media (hover: hover) { .switch:hover .track { background: var(--switch-hover-color); } }
+.switch:active .track { background: var(--switch-active-color); }
 .switch[aria-checked="true"] .track { background: var(--accent-bg-color); }
 .switch[aria-checked="true"] .track::after { translate: 20px; }
 /* The focus ring goes around the track, as on a GtkSwitch, not around the label. */
@@ -226,8 +233,9 @@ h1 { font-size: 1.125rem; font-weight: 700; line-height: 1.25; }
   font-variant-numeric: tabular-nums;
 }
 #rank { grid-area: rank; font-weight: 700; }
-#count { grid-area: count; color: var(--dim-color); }
-#chars { grid-area: chars; color: var(--dim-color); }
+#count { grid-area: count; }
+#chars { grid-area: chars; }
+#count, #chars { color: var(--dim-color); }
 .meter { grid-area: meter; height: 8px; background: var(--trough-color); border-radius: var(--pill-radius); overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--accent-bg-color); border-radius: inherit; transition: width var(--duration) var(--ease); }
 /* Over budget: the rank reads "Context Full" as well as turning red. */
@@ -262,7 +270,7 @@ h1 { font-size: 1.125rem; font-weight: 700; line-height: 1.25; }
   font-weight: 700;
 }
 .copy::after { content: ""; position: absolute; inset: 0; border-radius: inherit; transition: background-color var(--duration) var(--ease); }
-.copy:hover::after { background: rgb(255 255 255 / 10%); }
+@media (hover: hover) { .copy:hover::after { background: rgb(255 255 255 / 10%); } }
 .copy:active::after { background: rgb(0 0 6 / 20%); }
 .copy:disabled { opacity: var(--disabled-opacity); cursor: default; }
 .copy:disabled::after { display: none; }
@@ -294,10 +302,10 @@ h1 { font-size: 1.125rem; font-weight: 700; line-height: 1.25; }
 @media (min-width: 860px) {
   :root { --row-gap: 12px; } /* four rows fit a 1024×600 window without scrolling */
   header .clamp { grid-template-areas: "title switch" "sub switch"; row-gap: 0; }
-  .row { grid-template-columns: 112px minmax(0, 1fr); gap: var(--pad); }
+  .row { grid-template-columns: var(--label-width) minmax(0, 1fr); gap: var(--pad); }
   .rhead { display: grid; grid-template-columns: auto 1fr; align-content: start; padding-top: var(--gap); }
   .rprog { grid-column: 2; }
-  .dock .clamp { grid-template: "stat cmd" "stat note" / 300px minmax(0, 1fr); gap: 4px 32px; padding-block: 14px; }
+  .dock .clamp { grid-template: "stat cmd" "stat note" / var(--stat-width) minmax(0, 1fr); gap: 4px 32px; padding-block: 14px; }
   .stat { grid-area: stat; grid-template: "rank count" "meter meter" "chars chars" / 1fr auto; align-content: center; }
 }
 /* A full row of nine fixed tiles fits beside the labels. */

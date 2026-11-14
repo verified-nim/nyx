@@ -1,3 +1,4 @@
 nimcache/
 bin/
 nyx-logo.zip
+.venv/
